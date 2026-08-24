@@ -30,3 +30,5 @@ coverage
 *.tsbuildinfo
 
 echo "src/assets/*.mp4" >> .gitignore
+
+echo "public/public_imgs/gx1.png" >> .gitignore
