@@ -28,3 +28,5 @@ coverage
 *.sw?
 
 *.tsbuildinfo
+
+echo "src/assets/*.mp4" >> .gitignore
