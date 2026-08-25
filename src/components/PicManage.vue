@@ -234,18 +234,18 @@ async function processFile(file) {
         <div class="grid-container">
           <div v-for="(img, idx) in gridCells" :key="idx" class="grid-cell" :class="{ empty: !img }">
             <template v-if="img">
-              <!-- 右上角收藏星 -->
-              <button class="star-icon" @click.stop="toggleStar(img)">
-                <SvgIcon :name="img.is_star ? 'star_full' : 'star'" style="height: 20px; width: 20px; fill: gold" />
-              </button>
-              <!-- 删除按钮 -->
-              <button class="delete-icon" @click.stop="delete_img(img, activeCategory)">
-                <SvgIcon name="trash-can" style="height: 18px; width: 18px; fill: red" />
-              </button>
-              <!-- 下载按钮 -->
-              <button class="download-icon" @click.stop="download_img(img)">
-                <SvgIcon name="download" style="height: 18px; width: 18px; fill: steelblue" />
-              </button>
+              <!-- 文件夹操作图标（右上角竖排） -->
+              <div class="card-actions">
+                <button class="act star" :class="{ starred: img.is_star }" title="收藏" @click.stop="toggleStar(img)">
+                  <SvgIcon :name="img.is_star ? 'star_full' : 'star'" />
+                </button>
+                <button class="act download" title="下载" @click.stop="download_img(img)">
+                  <SvgIcon name="download" />
+                </button>
+                <button class="act delete" title="删除" @click.stop="delete_img(img, activeCategory)">
+                  <SvgIcon name="trash-can" />
+                </button>
+              </div>
               <!-- 图片 -->
               <img :src="img.thumbnail" @click="previewImage(img)" class="grid-img" />
               <!-- 底部名称编辑 -->
@@ -478,32 +478,63 @@ async function processFile(file) {
 .grid-cell.empty {
   background: #fef7e0;
 }
-.star-icon,
-.delete-icon,
-.download-icon {
+/* 卡片操作按钮（右上角竖排，简洁半透明） */
+.card-actions {
   position: absolute;
-  background: rgba(0,0,0,0.5);
-  border: none;
-  border-radius: 50%;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 2;
+}
+.act {
   width: 22px;
   height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.75);
+  color: rgba(0, 0, 0, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  z-index: 2;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+  transition: all 0.2s ease;
 }
-.star-icon {
-  top: 4px;
-  right: 4px;
+.act :deep(.svg-container) {
+  width: 14px;
+  height: 14px;
+  display: flex;
 }
-.delete-icon {
-  bottom: 4px;
-  right: 4px;
+.act :deep(.svg-icon) {
+  width: 100%;
+  height: 100%;
 }
-.download-icon {
-  bottom: 4px;
-  left: 4px;
+/* 收藏：悬停淡金色，已收藏态强制金黄色填充 */
+.act.star.starred :deep(.svg-icon) {
+  fill: #ffd700 !important;
+  stroke: #ffd700 !important;
+}
+.act.star.starred {
+  background: #fff7d6;
+}
+.act.star:hover {
+  background: #fff3cd;
+  color: #d4a017;
+  transform: scale(1.1);
+}
+/* 下载：悬停化蓝 */
+.act.download:hover {
+  background: #e4f0ff;
+  color: #3a7bd5;
+  transform: scale(1.1);
+}
+/* 删除：悬停化红 */
+.act.delete:hover {
+  background: #ffe3e3;
+  color: #d64545;
+  transform: scale(1.1);
 }
 .grid-img {
   width: 100%;
