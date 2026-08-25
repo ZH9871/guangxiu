@@ -2,7 +2,6 @@
   <div class="auth-page">
     <div class="auth-card">
       <div class="auth-head">
-        <span class="auth-logo">🧮</span>
         <h2>注册</h2>
         <p>创建账号，素材将保存到个人账号里</p>
       </div>
@@ -20,11 +19,12 @@
           <span class="field-label">确认密码</span>
           <input v-model="confirm" type="password" placeholder="请再次输入密码" autocomplete="new-password" />
         </label>
-        <button class="auth-btn" type="submit" :disabled="loading">
-          {{ loading ? '注册中…' : '注 册' }}
+        <button class="auth-btn" type="submit" :disabled="loading || countdown > 0">
+          {{ countdown > 0 ? `${countdown} 秒后跳转登录` : (loading ? '注册中…' : '注 册') }}
         </button>
       </form>
 
+      <p v-if="success" class="auth-success">{{ success }}</p>
       <p v-if="error" class="auth-error">{{ error }}</p>
 
       <p class="auth-switch">
@@ -35,7 +35,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore, api, notyf } from '@/store'
 
@@ -47,6 +47,9 @@ const password = ref('')
 const confirm = ref('')
 const loading = ref(false)
 const error = ref('')
+const success = ref('')
+const countdown = ref(0)
+let countdownTimer = null
 
 async function handleRegister() {
   const name = username.value.trim()
@@ -64,24 +67,36 @@ async function handleRegister() {
   }
   loading.value = true
   error.value = ''
+  success.value = ''
   try {
-    const res = await api.post('/register', {
+    await api.post('/register', {
       username: name,
       password: password.value,
     })
-    const { token, user_id, username: uname } = res.data
-    userStore.token = token
-    userStore.username = uname
-    userStore.user_id = user_id
-    userStore.isLoggedIn = true
-    notyf.success('注册成功，已自动登录')
-    router.push('/PicManage')
+    // 注册成功后不自动登录，倒计时跳转登录页
+    success.value = '注册成功，即将跳转登录…'
+    notyf.success('注册成功，请登录')
+    countdown.value = 3
+    countdownTimer = setInterval(() => {
+      countdown.value -= 1
+      if (countdown.value <= 0) {
+        clearInterval(countdownTimer)
+        router.push('/login')
+      }
+    }, 1000)
   } catch (e) {
     error.value = e.response?.data?.error || '注册失败，请稍后重试'
   } finally {
     loading.value = false
   }
 }
+
+onBeforeUnmount(() => {
+  if (countdownTimer) {
+    clearInterval(countdownTimer)
+    countdownTimer = null
+  }
+})
 </script>
 
 <style scoped>
@@ -108,19 +123,14 @@ async function handleRegister() {
   text-align: center;
   margin-bottom: 26px;
 }
-.auth-logo {
-  font-size: 38px;
-  display: block;
-  margin-bottom: 6px;
-}
 .auth-head h2 {
   margin: 0 0 6px;
-  font-size: 24px;
+  font-size: 30px;
   color: #1c7b51;
 }
 .auth-head p {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   color: #8a94a6;
 }
 .auth-form {
@@ -178,6 +188,12 @@ async function handleRegister() {
   margin: 14px 0 0;
   font-size: 13px;
   color: #d64545;
+  text-align: center;
+}
+.auth-success {
+  margin: 14px 0 0;
+  font-size: 13px;
+  color: #1c7b51;
   text-align: center;
 }
 .auth-switch {

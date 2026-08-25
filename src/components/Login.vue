@@ -2,7 +2,6 @@
   <div class="auth-page">
     <div class="auth-card">
       <div class="auth-head">
-        <span class="auth-logo">🧮</span>
         <h2>登录</h2>
         <p>登录后你的素材将保存到个人账号</p>
       </div>
@@ -94,19 +93,14 @@ async function handleLogin() {
   text-align: center;
   margin-bottom: 26px;
 }
-.auth-logo {
-  font-size: 38px;
-  display: block;
-  margin-bottom: 6px;
-}
 .auth-head h2 {
   margin: 0 0 6px;
-  font-size: 24px;
+  font-size: 30px;
   color: #1c7b51;
 }
 .auth-head p {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   color: #8a94a6;
 }
 .auth-form {

@@ -43,8 +43,6 @@ async function logout() {
         </template>
         <template v-else>
           <router-link class="auth-link" to="/login">登录</router-link>
-          <span class="auth-sep">/</span>
-          <router-link class="auth-link" to="/register">注册</router-link>
           <span class="guest-tag">访客</span>
         </template>
       </div>
