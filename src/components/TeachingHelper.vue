@@ -2103,10 +2103,10 @@ function calculateMaskBoundingBoxFromCanvas() {
 		background: #f0f0f0;
 		text-align: center;
 	}
-	.action-btn.save { background: #71ba94; color: white; }
-	.action-btn.download { background: #4caf50; color: white; }
-	.action-btn.delete { background: #f44336; color: white; }
-	.action-btn.clear { background: #ff9800; color: white; }
+	.action-btn.save { background: #85c0a0; color: white; }
+	.action-btn.download { background: #8bb8ad; color: white; }
+	.action-btn.delete { background: #e09a9a; color: white; }
+	.action-btn.clear { background: #d6b578; color: white; }
 
 	/* 响应式适配 */
 	@media (max-width: 1200px) {
