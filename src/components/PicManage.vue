@@ -3,7 +3,6 @@ import { ref, computed, watch } from 'vue'
 import { useImageStore, useUserStore, api } from '@/store'
 import SvgIcon from "@/components/Toolbox/SvgIcon.vue";
 import { download_image } from "@/tools.js";
-import ImageUploader from '@/components/Toolbox/ImageUploader.vue';
 import ImageNameEditor from "@/components/Toolbox/ImageNameEditor.vue";
 
 const userStore = useUserStore()
@@ -135,6 +134,52 @@ api.get("/first_user_id").then(res => {
 function handlePageChange(page) {
   currentPage.value = page
 }
+
+// ===== 上传图片控件（与 TeachingHelper 一致）=====
+const fileInput = ref(null)
+
+const triggerUpload = () => {
+  fileInput.value?.click()
+}
+
+const handleFileUpload = (event) => {
+  const file = event.target.files[0]
+  if (file) {
+    processFile(file)
+  }
+  event.target.value = null
+}
+
+const handleDrop = (event) => {
+  const file = event.dataTransfer.files[0]
+  if (file) {
+    processFile(file)
+  }
+}
+
+async function processFile(file) {
+  if (!file.type.match('image.*')) {
+    alert('请选择图片文件（JPG、PNG、WEBP格式）')
+    return
+  }
+  const formData = new FormData()
+  formData.append('image', file)
+  try {
+    const res = await api.post(`/image/${userStore.user_id}/uploads`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    try {
+      await api.get('/detections/update/' + res.data.id)
+    } catch (e) {}
+    // 跳回第一页并切到"上传图"分类，使新图立即显示
+    currentPage.value = 1
+    activeCategory.value = 'uploads'
+    await refreshData()
+  } catch (e) {
+    console.error('上传失败:', e)
+    alert('上传失败')
+  }
+}
 </script>
 
 <template>
@@ -147,9 +192,16 @@ function handlePageChange(page) {
         <span class="panel-title">素材管理</span>
       </div>
 
-      <!-- 上传图片控件 -->
+      <!-- 上传图片控件（样式与 TeachingHelper 一致） -->
       <div class="container-upload">
-        <ImageUploader style="width:100%;" />
+        <div class="upload-area" @click="triggerUpload" @drop.prevent="handleDrop" @dragover.prevent>
+          <div class="upload-icon">
+            <span class="icon-unicode">📁</span>
+          </div>
+          <p>点击上传刺绣图片或拖放文件到此处</p>
+          <p class="hint-text">支持 JPG、PNG、WEBP格式</p>
+          <input type="file" ref="fileInput" @change="handleFileUpload" style="display: none;" accept="image/*" />
+        </div>
       </div>
 
       <!-- 分类导航 -->
@@ -261,15 +313,54 @@ function handlePageChange(page) {
   font-size: 20px;
 }
 
-/* 上传控件（紧凑适配左侧窄栏） */
+/* 上传图片控件（与 TeachingHelper 一致，适当缩小适配左栏） */
 .container-upload {
-  font-size: 13px;
+  --primary-light: #e8f5e9;
+  --primary-main: #66bb6a;
+  --primary-dark: #2e7d32;
+  --text-secondary: #757575;
+
+  width: 100%;
+  padding: 14px;
+  background: #F3FEEA;
+  border-radius: 10px;
+  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.1);
+  font-family: 'Helvetica Neue', Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  color: #212121;
+  line-height: 1.6;
+  box-sizing: border-box;
 }
-.container-upload :deep(.upload-area) {
-  min-height: 130px;
+.container-upload .upload-area {
+  border: 2px dashed var(--primary-main);
+  border-radius: 8px;
+  padding: 16px 14px;
+  text-align: center;
+  margin-bottom: 0;
+  cursor: pointer;
+  transition: all 0.3s;
+  background: var(--primary-light);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
 }
-.container-upload :deep(.upload-icon) {
-  margin-bottom: 6px;
+.container-upload .upload-area:hover {
+  background: #dcf0dd;
+}
+.container-upload .upload-icon {
+  font-size: 1.6rem;
+  color: var(--primary-dark);
+  margin-bottom: 2px;
+}
+.container-upload p {
+  font-size: 12px;
+}
+.container-upload .hint-text {
+  color: var(--text-secondary);
+  font-style: italic;
+  margin-top: 10px;
+  text-align: center;
 }
 
 /* 分类导航 */

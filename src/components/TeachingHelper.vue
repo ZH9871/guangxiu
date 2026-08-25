@@ -1184,12 +1184,13 @@ function calculateMaskBoundingBoxFromCanvas() {
 	    alert('请选择图片文件（JPG、PNG、WEBP格式）')
 	    return
 	  }
+	  if (file.size > 10 * 1024 * 1024) {
+	    alert('文件大小不能超过10MB')
+	    return
+	  }
 	  
-	  // 检查文件大小
-	  // if (file.size > 10 * 1024 * 1024) {
-	  //   alert('文件大小不能超过5MB')
-	  //   return
-	  // }
+	  // 同时将图片上传到后端/服务器（不影响本地画布显示）
+	  uploadImageToBackend(file)
 	  
 	
 	  function selectUploadHistory(item) {
@@ -1257,8 +1258,24 @@ function calculateMaskBoundingBoxFromCanvas() {
 	  }
 	  reader.readAsDataURL(file)
 	}
-	
-	
+
+	// 将图片上传到后端/服务器，成功后刷新图库
+	const uploadImageToBackend = async (file) => {
+	  const formData = new FormData()
+	  formData.append('image', file)
+	  try {
+	    const res = await api.post(`/image/${userStore.user_id}/uploads`, formData, {
+	      headers: { 'Content-Type': 'multipart/form-data' }
+	    })
+	    try {
+	      await api.get('/detections/update/' + res.data.id)
+	    } catch (e) {}
+	    await imageStore.update_image_infos(userStore.user_id)
+	  } catch (e) {
+	    console.error('上传到服务器失败:', e)
+	    notyf.error('上传到服务器失败')
+	  }
+	}
 	
 	const formatFileSize = (bytes) => {
 	  if (bytes === 0) return '0 Bytes'
