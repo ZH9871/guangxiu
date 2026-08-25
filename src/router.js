@@ -7,6 +7,8 @@ import I2V from './components/I2V.vue';
 import T2I from './components/T2I.vue';
 import PicManage from './components/PicManage.vue';
 import BackFunc from "@/components/BackFunc.vue";
+import Login from "@/components/Login.vue";
+import Register from "@/components/Register.vue";
 
 const routes = [
     {
@@ -20,11 +22,6 @@ const routes = [
         component: TeachingHelper
     },
     {
-        path: '/',
-        name: 'Home',
-        component: Home
-    },
-    {
         path: '/Guangxiu',
         name: 'Guangxiu',
         component: Guangxiu
@@ -33,11 +30,6 @@ const routes = [
         path: '/T2I',
         name: 'T2I',
         component: T2I
-    },
-    {
-        path: '/Teaching',
-        name: 'Teaching',
-        component: TeachingHelper
     },
     {
         path: '/I2V',
@@ -53,6 +45,16 @@ const routes = [
         path: '/BackFunc',
         name: 'BackFunc',
         component: BackFunc
+    },
+    {
+        path: '/login',
+        name: 'Login',
+        component: Login
+    },
+    {
+        path: '/register',
+        name: 'Register',
+        component: Register
     },
 ]
 

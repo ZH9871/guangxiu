@@ -423,6 +423,8 @@
 			console.error('目标检测与分割失败:', e)
 		})
 	});
+	//后端上传是否已返回真实图片ID（避免本地临时ID覆盖真实ID）
+	let uploadBackendResolved = false;
 	//右键拖动
 	let isDragging = false;
 	let isDrawing = false;
@@ -1217,8 +1219,10 @@ function calculateMaskBoundingBoxFromCanvas() {
 	      // 清空检测数据
 	      image_detections.length = 0
 	      
-	      // 设置当前选中的图片ID为上传的临时ID
-	      userStore.t_selectedImageId = 'uploaded_' + Date.now()
+	      // 若后端尚未同步真实ID，则先用本地临时ID占位（后端上传成功后会被真实ID覆盖）
+	      if (!uploadBackendResolved) {
+	        userStore.t_selectedImageId = 'uploaded_' + Date.now()
+	      }
 	      
 	      // 等待图片加载完成后初始化画布
 	      if (canvas && ctx) {
@@ -1259,7 +1263,7 @@ function calculateMaskBoundingBoxFromCanvas() {
 	  reader.readAsDataURL(file)
 	}
 
-	// 将图片上传到后端/服务器，成功后刷新图库
+	// 将图片上传到后端/服务器，成功后刷新图库；返回后端真实图片ID
 	const uploadImageToBackend = async (file) => {
 	  const formData = new FormData()
 	  formData.append('image', file)
@@ -1267,13 +1271,18 @@ function calculateMaskBoundingBoxFromCanvas() {
 	    const res = await api.post(`/image/${userStore.user_id}/uploads`, formData, {
 	      headers: { 'Content-Type': 'multipart/form-data' }
 	    })
+	    // 用后端真实ID替换本地临时ID，确保自动分割/检测使用正确的图
+	    userStore.t_selectedImageId = res.data.id
+	    uploadBackendResolved = true
 	    try {
 	      await api.get('/detections/update/' + res.data.id)
 	    } catch (e) {}
 	    await imageStore.update_image_infos(userStore.user_id)
+	    return res.data.id
 	  } catch (e) {
 	    console.error('上传到服务器失败:', e)
 	    notyf.error('上传到服务器失败')
+	    return null
 	  }
 	}
 	

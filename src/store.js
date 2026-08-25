@@ -9,6 +9,22 @@ export const api = axios.create({
     // baseURL: 'http://charint.sv6.tunnelfrp.com/',
 });
 
+// 请求拦截：自动携带登录 token
+api.interceptors.request.use((config) => {
+    try {
+        const raw = localStorage.getItem('user-store');
+        if (raw) {
+            const state = JSON.parse(raw);
+            const token = state && (state.token || (state._ && state._.token));
+            if (token) {
+                config.headers = config.headers || {};
+                config.headers['Authorization'] = 'Bearer ' + token;
+            }
+        }
+    } catch (e) {}
+    return config;
+}, (error) => Promise.reject(error));
+
 let uid='';
 
 export const notyf = new Notyf({
@@ -18,6 +34,9 @@ export const notyf = new Notyf({
 });
 export const useUserStore = defineStore('user', () => {
     const user_id=ref("id")
+    const token=ref("")
+    const username=ref("")
+    const isLoggedIn=ref(false)
     //图片
     const upload_s=ref(true)
     const seg_s=ref(true)
@@ -53,7 +72,7 @@ export const useUserStore = defineStore('user', () => {
     const i2v_style=ref("默认")
 
 
-    return {user_id,
+    return {user_id, token, username, isLoggedIn,
         upload_s,seg_s,gen_static_s,gen_dynamic_s,
         t_selector_index,t_selectedImageId, t_gens_s,t_upload_s,t_auto_classify,t_auto_segment,t_mask_s,
         t2i_poem,t2i_poem_hint,t2i_pixel_index,t2i_ref_id,t2i_gen_num,t2i_lora,t2i_cfg,t2i_steps,t2i_gen_mask,t2i_gen_process,
@@ -63,7 +82,7 @@ export const useUserStore = defineStore('user', () => {
     persist: {
         key: 'user-store',    // 自定义存储键名（可选）
         storage: localStorage, // 指定存储方式（可选）
-        paths: ['count']      // 仅持久化 count 状态（可选）
+        paths: ['user_id', 'token', 'username', 'isLoggedIn']      // 持久化登录态，刷新不丢失
     }
 })
 

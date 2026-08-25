@@ -7,6 +7,21 @@ api.get("/first_user_id").then(res => {
   imageStore.update_image_infos(userStore.user_id).then(imageStore.load_thumbnails)
 })
 
+async function logout() {
+  try {
+    await api.post('/logout')
+  } catch (e) {}
+  userStore.token = ''
+  userStore.username = ''
+  userStore.user_id = ''
+  userStore.isLoggedIn = false
+  notyf.success('已退出登录')
+  // 重新拿游客数据
+  const res = await api.get('/first_user_id')
+  userStore.user_id = res.data
+  imageStore.update_image_infos(userStore.user_id).then(imageStore.load_thumbnails)
+}
+
 //notyf.success('操作成功！');
 
 </script>
@@ -21,7 +36,18 @@ api.get("/first_user_id").then(res => {
         <router-link class="router-link" to="/I2V">广绣活化</router-link>
         <router-link class="router-link" to="/PicManage">图库管理</router-link>
       </div>
-      <p class=" text-xl">访客^_^已登录</p>
+      <div class="auth-area">
+        <template v-if="userStore.isLoggedIn">
+          <span class="user-chip">{{ userStore.username }}</span>
+          <button class="auth-link" @click="logout">退出</button>
+        </template>
+        <template v-else>
+          <router-link class="auth-link" to="/login">登录</router-link>
+          <span class="auth-sep">/</span>
+          <router-link class="auth-link" to="/register">注册</router-link>
+          <span class="guest-tag">访客</span>
+        </template>
+      </div>
     </div>
   </header>
   <main class="guangxiu-minimalist-blue justify-center overflow-auto">
@@ -87,6 +113,45 @@ api.get("/first_user_id").then(res => {
     background: #ffffff;
     color: #1C7B51;
   }
+}
+.auth-area {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.auth-link {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 2rem;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.18);
+  transition: background-color 0.25s ease, color 0.25s ease;
+  &:hover {
+    background: #ffffff;
+    color: #1C7B51;
+  }
+}
+.auth-sep {
+  color: rgba(255, 255, 255, 0.85);
+}
+.guest-tag {
+  color: #eafff2;
+  font-size: 13px;
+  padding: 4px 10px;
+  border-radius: 2rem;
+  background: rgba(255, 255, 255, 0.15);
+  margin-left: 4px;
+}
+.user-chip {
+  color: #1C7B51;
+  background: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 6px 16px;
+  border-radius: 2rem;
 }
 .guangxiu-minimalist-blue {
   background: linear-gradient(
