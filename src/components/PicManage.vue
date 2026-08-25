@@ -18,11 +18,14 @@ const pageSize = 20  // 每页20个格子 (5x4)
 
 // 分类映射
 const categoryMap = {
-  uploads: { name: '上传图', key: 'uploads' },
-  generated_statics: { name: '文生图', key: 'generated_statics' },
-  generated_dynamics: { name: '图生视频', key: 'generated_dynamics' },
-  segmentations: { name: '分割图', key: 'segmentations' }
+  uploads: { name: '上传图', icon: '🖼️', key: 'uploads' },
+  generated_statics: { name: '文生图', icon: '✨', key: 'generated_statics' },
+  generated_dynamics: { name: '图生视频', icon: '🎬', key: 'generated_dynamics' },
+  segmentations: { name: '分割图', icon: '✂️', key: 'segmentations' }
 }
+
+// 当前分类标题信息
+const activeInfo = computed(() => categoryMap[activeCategory.value] || categoryMap.uploads)
 
 // 获取当前分类的完整图片数组
 const currentImages = computed(() => {
@@ -136,63 +139,86 @@ function handlePageChange(page) {
 
 <template>
   <div class="two-col-layout">
-    <!-- 左侧面板（不变） -->
+    <!-- 左侧导航面板 -->
     <div class="left-panel">
-      <div class="upload-area">
+      <!-- 面板标题 -->
+      <div class="panel-heading">
+        <span class="panel-logo">🧮</span>
+        <span class="panel-title">素材管理</span>
+      </div>
+
+      <!-- 上传图片控件 -->
+      <div class="container-upload">
         <ImageUploader style="width:100%;" />
       </div>
-      <div class="category-buttons">
-        <button 
-          v-for="(info, key) in categoryMap" 
+
+      <!-- 分类导航 -->
+      <nav class="side-nav">
+        <button
+          v-for="(info, key) in categoryMap"
           :key="key"
-          :class="['cat-btn', { active: activeCategory === key }]"
+          :class="['nav-item', { active: activeCategory === key }]"
           @click="activeCategory = key"
         >
-          {{ info.name }}
+          <span class="nav-icon">{{ info.icon }}</span>
+          <span class="nav-text">{{ info.name }}</span>
         </button>
-      </div>
+      </nav>
     </div>
 
     <!-- 中间区域（网格 + 分页） -->
     <div class="middle-area">
-      <div class="grid-container">
-        <div v-for="(img, idx) in gridCells" :key="idx" class="grid-cell" :class="{ empty: !img }">
-          <template v-if="img">
-            <!-- 右上角收藏星 -->
-            <button class="star-icon" @click.stop="toggleStar(img)">
-              <SvgIcon :name="img.is_star ? 'star_full' : 'star'" style="height: 20px; width: 20px; fill: gold" />
-            </button>
-            <!-- 删除按钮 -->
-            <button class="delete-icon" @click.stop="delete_img(img, activeCategory)">
-              <SvgIcon name="trash-can" style="height: 18px; width: 18px; fill: red" />
-            </button>
-            <!-- 下载按钮 -->
-            <button class="download-icon" @click.stop="download_img(img)">
-              <SvgIcon name="download" style="height: 18px; width: 18px; fill: steelblue" />
-            </button>
-            <!-- 图片 -->
-            <img :src="img.thumbnail" @click="previewImage(img)" class="grid-img" />
-            <!-- 底部名称编辑 -->
-            <div class="img-name">
-              <ImageNameEditor :info="img" />
-            </div>
-          </template>
-          <div v-else class="empty-placeholder"></div>
+      <!-- 可滚动内容区 -->
+      <div class="content-scroll">
+        <!-- 分类标题栏 -->
+        <div class="content-header">
+          <h2 class="content-title">
+            <span class="title-icon">{{ activeInfo.icon }}</span>
+            {{ activeInfo.name }}
+          </h2>
+          <span class="content-count">共 {{ totalCount }} 张</span>
         </div>
+
+        <div class="grid-container">
+          <div v-for="(img, idx) in gridCells" :key="idx" class="grid-cell" :class="{ empty: !img }">
+            <template v-if="img">
+              <!-- 右上角收藏星 -->
+              <button class="star-icon" @click.stop="toggleStar(img)">
+                <SvgIcon :name="img.is_star ? 'star_full' : 'star'" style="height: 20px; width: 20px; fill: gold" />
+              </button>
+              <!-- 删除按钮 -->
+              <button class="delete-icon" @click.stop="delete_img(img, activeCategory)">
+                <SvgIcon name="trash-can" style="height: 18px; width: 18px; fill: red" />
+              </button>
+              <!-- 下载按钮 -->
+              <button class="download-icon" @click.stop="download_img(img)">
+                <SvgIcon name="download" style="height: 18px; width: 18px; fill: steelblue" />
+              </button>
+              <!-- 图片 -->
+              <img :src="img.thumbnail" @click="previewImage(img)" class="grid-img" />
+              <!-- 底部名称编辑 -->
+              <div class="img-name">
+                <ImageNameEditor :info="img" />
+              </div>
+            </template>
+            <div v-else class="empty-placeholder"></div>
+          </div>
+        </div>
+        <div v-if="totalCount === 0" class="empty-tip">暂无图片</div>
       </div>
 
-      <!-- 分页组件 -->
+      <!-- 固定底部分页 -->
       <div class="pagination-wrapper">
-  <el-pagination
-    background
-    layout="prev, pager, next"
-    :total="totalCount"
-    :page-size="pageSize"
-    :current-page="currentPage"
-    @current-change="handlePageChange"
-  />
-</div>
-<div v-if="totalCount === 0" class="empty-tip">暂无图片</div>
+        <el-pagination
+          small
+          background
+          layout="prev, pager, next"
+          :total="totalCount"
+          :page-size="pageSize"
+          :current-page="currentPage"
+          @current-change="handlePageChange"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -205,43 +231,96 @@ function handlePageChange(page) {
   height: 90dvh;
   box-sizing: border-box;
   overflow: hidden;
-  background: #e8f5e9;
+  background: #f0f7f1;
 }
 
-/* 左侧面板样式不变 */
+/* 左侧面板 */
 .left-panel {
-  width: 240px;
+  width: 260px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
   background: white;
   border-radius: 16px;
   padding: 16px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 }
-.upload-area {
-  min-height: 200px;
+
+/* 面板标题 */
+.panel-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #2e7d32;
+  padding: 4px 6px 10px;
+  border-bottom: 1px solid #eef4ee;
 }
-.category-buttons {
+.panel-logo {
+  font-size: 20px;
+}
+
+/* 上传控件（紧凑适配左侧窄栏） */
+.container-upload {
+  font-size: 13px;
+}
+.container-upload :deep(.upload-area) {
+  min-height: 130px;
+}
+.container-upload :deep(.upload-icon) {
+  margin-bottom: 6px;
+}
+
+/* 分类导航 */
+.side-nav {
   display: flex;
   flex-direction: column;
+  gap: 8px;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
   gap: 12px;
-}
-.cat-btn {
-  padding: 10px;
-  background: #e8f5e9;
+  padding: 12px 14px;
+  background: transparent;
   border: none;
-  border-radius: 8px;
-  font-size: 16px;
+  border-radius: 10px;
+  font-size: 15px;
+  color: #4a5568;
+  text-align: left;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.25s ease;
+  position: relative;
 }
-.cat-btn.active {
-  background: #71BA94;
-  color: white;
+.nav-icon {
+  font-size: 18px;
+  width: 24px;
+  text-align: center;
 }
-.cat-btn:hover {
-  transform: translateX(4px);
+.nav-text {
+  flex: 1;
+  font-weight: 500;
+}
+/* 激活态：左侧指示条 + 渐变浅绿背景 */
+.nav-item.active {
+  background: linear-gradient(90deg, #dff3e2, #eff9f0);
+  color: #1b6e31;
+  font-weight: 600;
+}
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 60%;
+  border-radius: 0 3px 3px 0;
+  background: #2e7d32;
+}
+.nav-item:hover {
+  background: #f0faf2;
 }
 
 /* 中间区域 */
@@ -249,25 +328,61 @@ function handlePageChange(page) {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: #e8f5e9;
+  min-width: 0;
+  background: #ffffff;
   border-radius: 16px;
   padding: 16px;
-  overflow-y: auto;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
+/* 可滚动内容区（高度自适应屏幕，超出时仅此区滚动） */
+.content-scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* 主区域标题栏 */
+.content-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #eef4ee;
+}
+.content-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #2e7d32;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.title-icon {
+  font-size: 22px;
+}
+.content-count {
+  font-size: 13px;
+  color: #8a94a6;
+  background: #eff6f0;
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+
 .grid-container {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 12px;
-  margin-bottom: 20px;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
 }
 .grid-cell {
   aspect-ratio: 1 / 1;
   background: #fff9e8;
-  border-radius: 12px;
+  border-radius: 8px;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
 }
 .grid-cell.empty {
   background: #fef7e0;
@@ -279,8 +394,8 @@ function handlePageChange(page) {
   background: rgba(0,0,0,0.5);
   border: none;
   border-radius: 50%;
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -288,16 +403,16 @@ function handlePageChange(page) {
   z-index: 2;
 }
 .star-icon {
-  top: 6px;
-  right: 6px;
+  top: 4px;
+  right: 4px;
 }
 .delete-icon {
-  bottom: 6px;
-  right: 6px;
+  bottom: 4px;
+  right: 4px;
 }
 .download-icon {
-  bottom: 6px;
-  left: 6px;
+  bottom: 4px;
+  left: 4px;
 }
 .grid-img {
   width: 100%;
@@ -316,8 +431,8 @@ function handlePageChange(page) {
   right: 0;
   background: rgba(0,0,0,0.6);
   color: white;
-  font-size: 12px;
-  padding: 4px;
+  font-size: 11px;
+  padding: 2px 4px;
   text-align: center;
 }
 .empty-placeholder {
@@ -326,11 +441,13 @@ function handlePageChange(page) {
   background: #fef7e0;
 }
 
-/* 分页样式 */
+/* 分页样式（固定底部，始终可见） */
 .pagination-wrapper {
   display: flex;
   justify-content: center;
-  margin-top: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
 }
 .empty-tip {
   text-align: center;
@@ -338,8 +455,18 @@ function handlePageChange(page) {
   color: #6c757d;
 }
 
-/* 响应式调整：当宽度不足时，保持网格比例 */
+/* 响应式：屏幕越窄，每行列数越少，自适应分辨率 */
+@media (max-width: 1600px) {
+  .grid-container { grid-template-columns: repeat(7, 1fr); }
+}
+@media (max-width: 1300px) {
+  .grid-container { grid-template-columns: repeat(6, 1fr); }
+}
+@media (max-width: 1000px) {
+  .grid-container { grid-template-columns: repeat(5, 1fr); }
+}
 @media (max-width: 768px) {
+  .grid-container { grid-template-columns: repeat(4, 1fr); }
   .two-col-layout {
     flex-direction: column;
   }
@@ -348,7 +475,7 @@ function handlePageChange(page) {
     flex-direction: row;
     flex-wrap: wrap;
   }
-  .category-buttons {
+  .side-nav {
     flex-direction: row;
     flex-wrap: wrap;
   }
