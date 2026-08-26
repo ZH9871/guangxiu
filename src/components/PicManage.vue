@@ -20,7 +20,8 @@ const categoryMap = {
   uploads: { name: '上传图', icon: '🖼️', key: 'uploads' },
   generated_statics: { name: '文生图', icon: '✨', key: 'generated_statics' },
   generated_dynamics: { name: '图生视频', icon: '🎬', key: 'generated_dynamics' },
-  segmentations: { name: '分割图', icon: '✂️', key: 'segmentations' }
+  segmentations: { name: '分割图', icon: '✂️', key: 'segmentations' },
+  system_library: { name: '系统图库', icon: '🏛️', key: 'system_library' }
 }
 
 // 当前分类标题信息
@@ -33,6 +34,7 @@ const currentImages = computed(() => {
     case 'generated_statics': return imageStore.generated_statics
     case 'generated_dynamics': return imageStore.generated_dynamics
     case 'segmentations': return imageStore.segmentations
+    case 'system_library': return imageStore.systemImages
     default: return []
   }
 })
@@ -129,6 +131,7 @@ api.get("/first_user_id").then(res => {
   userStore.user_id = res.data
   imageStore.update_image_infos(userStore.user_id).then(imageStore.load_thumbnails)
 })
+imageStore.load_system_images()
 
 // 分页事件
 function handlePageChange(page) {
@@ -234,8 +237,8 @@ async function processFile(file) {
         <div class="grid-container">
           <div v-for="(img, idx) in gridCells" :key="idx" class="grid-cell" :class="{ empty: !img }">
             <template v-if="img">
-              <!-- 文件夹操作图标（右上角竖排） -->
-              <div class="card-actions">
+              <!-- 系统图为前端静态图，无后端id，不提供收藏/删除/改名 -->
+              <div v-if="!img.is_system" class="card-actions">
                 <button class="act star" :class="{ starred: img.is_star }" title="收藏" @click.stop="toggleStar(img)">
                   <SvgIcon :name="img.is_star ? 'star_full' : 'star'" />
                 </button>
@@ -246,11 +249,17 @@ async function processFile(file) {
                   <SvgIcon name="trash-can" />
                 </button>
               </div>
+              <div v-else class="card-actions">
+                <button class="act download" title="下载" @click.stop="download_img(img)">
+                  <SvgIcon name="download" />
+                </button>
+              </div>
               <!-- 图片 -->
               <img :src="img.thumbnail" @click="previewImage(img)" class="grid-img" />
               <!-- 底部名称编辑 -->
               <div class="img-name">
-                <ImageNameEditor :info="img" />
+                <ImageNameEditor v-if="!img.is_system" :info="img" />
+                <span v-else class="sys-img-name">{{ img.name }}</span>
               </div>
             </template>
             <div v-else class="empty-placeholder"></div>

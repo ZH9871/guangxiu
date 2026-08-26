@@ -16,13 +16,38 @@ api.get("/first_user_id").then(res => {
   userStore.user_id = res.data
   imageStore.update_image_infos(userStore.user_id).then(imageStore.load_thumbnails)
 })
+imageStore.load_system_images()
 
 // 参考图相关
 const ref_src = ref(generateImageWithText(600, 600, '请从左侧图库\n单击选择参考图'))
 const ref_id = ref("")
 
 function selected_change(item) {
+  if (item.is_system) {
+    // 系统图为前端静态图，先上传到后端 uploads 获得真实 id
+    notyf.info('正在上传系统图...')
+    selectedChangeSystem(item).then(() => {
+      notyf.success('系统图已就绪')
+    })
+    return
+  }
   ref_id.value = item.id
+  ref_src.value = item.thumbnail
+}
+
+// 系统图上传后端并选中（获取真实id）
+async function selectedChangeSystem(item) {
+  const res = await fetch(item.src)
+  const blob = await res.blob()
+  const file = new File([blob], item.name, { type: blob.type || 'image/jpeg' })
+  const formData = new FormData()
+  formData.append('image', file)
+  const up = await api.post(`/image/${userStore.user_id}/uploads`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+  const id = up.data.id
+  await imageStore.update_image_infos(userStore.user_id)
+  ref_id.value = id
   ref_src.value = item.thumbnail
 }
 
@@ -140,6 +165,11 @@ const galleryImages = computed(() => {
   return [...imageStore.uploads, ...imageStore.generated_statics]
 })
 
+// 系统广绣图库（前端静态图）
+const systemGalleryImages = computed(() => {
+  return imageStore.systemImages
+})
+
 import { nextTick } from 'vue'
 </script>
 
@@ -157,6 +187,15 @@ import { nextTick } from 'vue'
           <div v-for="img in galleryImages" :key="img.id" class="gallery-item" @click="selected_change(img)">
             <img :src="img.thumbnail" class="gallery-thumb" />
             <div class="gallery-name">{{ img.name }}</div>
+          </div>
+        </div>
+        <div v-show="galleryOpen" class="system-gallery">
+          <div class="system-gallery-label">🏛️ 系统广绣图库</div>
+          <div class="gallery-grid">
+            <div v-for="img in systemGalleryImages" :key="img.id" class="gallery-item" @click="selected_change(img)">
+              <img :src="img.thumbnail" class="gallery-thumb" />
+              <div class="gallery-name">{{ img.name }}</div>
+            </div>
           </div>
         </div>
       </div>
@@ -301,6 +340,18 @@ import { nextTick } from 'vue'
   flex-shrink: 0;
   border-bottom: 2px solid #e8f5e9;
   padding-bottom: 12px;
+}
+.system-gallery {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #cde5d3;
+}
+.system-gallery-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #5a8f72;
+  margin-bottom: 6px;
+  padding-left: 2px;
 }
 .gallery-header {
   display: flex;

@@ -97,6 +97,27 @@ function sortByStarAndDate(a, b) {
 }
 
 
+// 系统广绣图库：放置于前端 public/guangxiu_imgs 下的静态图片
+// 仅前端静态展示，不托管于后端；选中后才上传至后端 uploads 获得真实 id
+const SYSTEM_IMAGE_FILES = [
+    '13fcbc1f33fe8706a3028631cc64dd73.jpg',
+    '33f4cca37b30f81c34c2eb655b8ceb39.jpg',
+    '3528d08c7f0a98f0c0702e954db91f7b.jpg',
+    'a189d0a67794f6069d352fffd9b2747f.jpg',
+    'aad267be2f4ec8ac108228f4e1d50e90.jpg',
+    'adc1d68c385d8c69257ee5f2112a0935.jpg',
+    'b661a2dd6bae0f4a6c9d3c3162c1dc42.jpg',
+    'bd59c75d196815871bb9f192a5ffd64d.jpg',
+    'c7d398176bc0b846627c0fc73c888326.jpg',
+    'f889d5a1b71fa6760af073756f1efc36.jpg',
+    'IMG20250113145452.jpg',
+    'IMG20250113150023.jpg',
+    'IMG20250113150043.jpg',
+    'IMG20250113150152.jpg',
+    'IMG20250113153313.jpg',
+    'mmexport1737002949570.jpg'
+]
+
 export const useImageStore = defineStore('image', () => {
 
     const uploads=ref([])	//用户上传图片
@@ -108,6 +129,20 @@ export const useImageStore = defineStore('image', () => {
 
     const temp_generated_statics=ref([])	//生成的静态图像
     const generated_statics=ref([])
+
+    const systemImages=ref([])	//系统广绣图（前端静态，public/guangxiu_imgs）
+
+    // 加载系统广绣图库：生成静态 /guangxiu_imgs/<urlencoded 文件名> 地址
+    function load_system_images() {
+        if (systemImages.value.length > 0) return
+        systemImages.value = SYSTEM_IMAGE_FILES.map(name => ({
+            id: 'sys_' + name,          // 前端临时 id，无后端对应
+            name,
+            src: '/guangxiu_imgs/' + encodeURIComponent(name),
+            thumbnail: '/guangxiu_imgs/' + encodeURIComponent(name),
+            is_system: true
+        }))
+    }
 
     // function find(id){
     //     const merged =  generated_ImageUploaddynamics.value.concat(
@@ -278,11 +313,14 @@ export const useImageStore = defineStore('image', () => {
         }
     }
     return {
-         generated_dynamics, generated_statics,segmentations,temp_segmentations, temp_generated_dynamics,temp_generated_statics,uploads,
+         generated_dynamics, generated_statics,segmentations,temp_segmentations, temp_generated_dynamics,temp_generated_statics,uploads,systemImages,
         find,
         update_image_infos ,load_thumbnails,
-        load_full,load_full_by_id,get_full,load_video_full,get_thumbnail,get_video_full}
+        load_full,load_full_by_id,get_full,load_video_full,get_thumbnail,get_video_full,load_system_images
+    }
 })
+
+export const systemImageFiles = SYSTEM_IMAGE_FILES
 
 export const example_poetrys=[
     {title:"《春晓》孟浩然\n",body:"夜来风雨声，\n花落知多少。"},

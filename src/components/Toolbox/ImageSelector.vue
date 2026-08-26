@@ -16,6 +16,8 @@
                @click="activeTab = 'uploads'">上传记录</button>
           <button class="img-tab-btn" :class="{ active: activeTab === 'generated' }"
                @click="activeTab = 'generated'">文生图</button>
+          <button class="img-tab-btn" :class="{ active: activeTab === 'system' }"
+               @click="activeTab = 'system'">系统图</button>
         </div>
       </div>
 
@@ -44,6 +46,18 @@
           </div>
           <div v-if="imageStore.generated_statics.length === 0" class="img-empty">暂无生成图片</div>
         </div>
+
+        <div v-if="activeTab === 'system'" class="images-grid">
+          <div v-for="item in imageStore.systemImages" :key="item.id"
+               class="image-item"
+               :class="{ 'selected': selectedImage === item }"
+               @click="selectImage(item)">
+            <img :src="item.thumbnail" :alt="item.name"
+                 class="image-thumb" />
+            <div class="checkmark">✓</div>
+          </div>
+          <div v-if="imageStore.systemImages.length === 0" class="img-empty">系统图库为空</div>
+        </div>
       </div>
 
       <!-- 弹窗底部 -->
@@ -58,7 +72,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import { useImageStore } from '@/store'
+import { useImageStore, useUserStore, api, notyf } from '@/store'
 
 const emit = defineEmits(['image-selected'])
 
@@ -71,6 +85,7 @@ const props = defineProps({
 })
 
 const imageStore = useImageStore()
+const userStore = useUserStore()
 const showModal = ref(false)
 const activeTab = ref('uploads')
 const selectedImage = ref(null)
@@ -79,6 +94,7 @@ const selectedImage = ref(null)
 const openModal = () => {
   showModal.value = true
   selectedImage.value = null
+  imageStore.load_system_images()
 }
 
 // 关闭模态窗口
@@ -93,12 +109,45 @@ const selectImage = (image) => {
 }
 
 // 确认选择
-const confirmSelection = () => {
+const confirmSelection = async () => {
   if (selectedImage.value) {
+    // 系统图为前端静态图，需先上传到后端 uploads 获得真实 id
+    if (selectedImage.value.is_system) {
+      try {
+        const id = await uploadSystemImage(selectedImage.value.src, selectedImage.value.name)
+        if (!id) {
+          notyf.error('系统图上传后端失败，请重试')
+          closeModal()
+          return
+        }
+        await imageStore.update_image_infos(userStore.user_id)
+        props.onSelectedChange(id)
+        closeModal()
+        return
+      } catch (e) {
+        console.error('上传系统图失败:', e)
+        notyf.error('上传系统图失败')
+        closeModal()
+        return
+      }
+    }
     // 调用父组件传递的selected_change函数
     props.onSelectedChange(selectedImage.value.id)
     closeModal()
   }
+}
+
+// 将系统图(静态URL)下载成文件并上传到后端 uploads，返回真实id
+async function uploadSystemImage(url, name) {
+  const res = await fetch(url)
+  const blob = await res.blob()
+  const file = new File([blob], name, { type: blob.type || 'image/jpeg' })
+  const formData = new FormData()
+  formData.append('image', file)
+  const up = await api.post(`/image/${userStore.user_id}/uploads`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+  return up.data.id
 }
 
 // ESC键关闭弹窗
