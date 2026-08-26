@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useImageStore, useUserStore, api } from '@/store'
 import SvgIcon from "@/components/Toolbox/SvgIcon.vue";
 import { download_image } from "@/tools.js";
@@ -11,9 +11,11 @@ const imageStore = useImageStore()
 // 当前激活的分类
 const activeCategory = ref('uploads')
 
-// 分页相关
+// 分页相关：每页容量由右侧可视区域自适应(列数×行数铺满)
 const currentPage = ref(1)
-const pageSize = 20  // 每页20个格子 (5x4)
+const cols = ref(8)       // 网格列数
+const cellSize = ref(150) // 单元格边长(px)
+const pageSize = computed(() => cols.value * rowsForHeight())
 
 // 分类映射
 const categoryMap = {
@@ -44,18 +46,39 @@ const totalCount = computed(() => currentImages.value.length)
 
 // 当前页显示的图片（切片）
 const paginatedImages = computed(() => {
-  const start = (currentPage.value - 1) * pageSize
-  const end = start + pageSize
+  const start = (currentPage.value - 1) * pageSize.value
+  const end = start + pageSize.value
   return currentImages.value.slice(start, end)
 })
 
-// 生成20个格子（不满补null）
-const gridCells = computed(() => {
-  const cells = []
-  for (let i = 0; i < pageSize; i++) {
-    cells.push(paginatedImages.value[i] || null)
-  }
-  return cells
+// 根据可视高计算可容纳的行数（单元格为正方形）
+function rowsForHeight() {
+  const viewH = window.innerHeight
+  // 占用：面板上下padding(20*2) + 内容头(~64) + 分页区(~64)
+  const availableH = viewH * 0.9 - 40 - 72 - 64
+  return Math.max(2, Math.floor(availableH / (cellSize.value + 8)))
+}
+
+// 计算网格列数与单元格尺寸，使右侧铺满
+function layoutGrid() {
+  const viewW = window.innerWidth
+  // 右面板可用宽 ≈ 屏宽 - 左栏(260) - 外距(40) - 右内距(32)
+  const availableW = viewW - 260 - 72
+  const minCell = 170
+  const gap = 8
+  cols.value = Math.max(3, Math.floor(availableW / (minCell + gap)))
+  // 单元格宽度(铺满) = (可用宽 - 间隙) / 列数
+  const w = (availableW - gap * (cols.value - 1)) / cols.value
+  cellSize.value = Math.max(120, w)
+}
+
+// 布局挂在/卸载
+onMounted(() => {
+  layoutGrid()
+  window.addEventListener('resize', layoutGrid)
+})
+onUnmounted(() => {
+  window.removeEventListener('resize', layoutGrid)
 })
 
 // 刷新数据（删除或上传后调用）
@@ -77,7 +100,7 @@ async function delete_img(item, cate) {
   await refreshData()
   // 如果当前页没有数据了，跳转到上一页
   const newTotal = currentImages.value.length
-  const maxPage = Math.ceil(newTotal / pageSize)
+  const maxPage = Math.ceil(newTotal / pageSize.value)
   if (currentPage.value > maxPage && maxPage > 0) {
     currentPage.value = maxPage
   } else if (newTotal === 0) {
@@ -234,8 +257,8 @@ async function processFile(file) {
           <span class="content-count">共 {{ totalCount }} 张</span>
         </div>
 
-        <div class="grid-container">
-          <div v-for="(img, idx) in gridCells" :key="idx" class="grid-cell" :class="{ empty: !img }">
+        <div class="grid-container" :style="{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gridAutoRows: `${cellSize}px` }">
+          <div v-for="img in paginatedImages" :key="img.id" class="grid-cell">
             <template v-if="img">
               <!-- 系统图为前端静态图，无后端id，不提供收藏/删除/改名 -->
               <div v-if="!img.is_system" class="card-actions">
@@ -262,7 +285,6 @@ async function processFile(file) {
                 <span v-else class="sys-img-name">{{ img.name }}</span>
               </div>
             </template>
-            <div v-else class="empty-placeholder"></div>
           </div>
         </div>
         <div v-if="totalCount === 0" class="empty-tip">暂无图片</div>
@@ -477,7 +499,8 @@ async function processFile(file) {
   margin-bottom: 8px;
 }
 .grid-cell {
-  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: stretch;
   background: #fff9e8;
   border-radius: 8px;
   position: relative;

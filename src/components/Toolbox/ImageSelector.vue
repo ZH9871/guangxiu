@@ -196,7 +196,7 @@ defineExpose({
 .img-modal {
   width: 100%;
   max-width: 900px;
-  max-height: 80vh;
+  height: 70vh;
   background: #ffffff;
   border-radius: 16px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
@@ -281,7 +281,8 @@ defineExpose({
 
 /* ===== 图片内容区域 ===== */
 .img-modal-content {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   padding: 16px 24px;
   background: #ffffff;
