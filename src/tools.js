@@ -26,15 +26,15 @@ export function generateImageWithText(width, height, text, fontSizeRatio = 8) {
     // ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // 设置文字样式
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = '#578857';  // 画布提示词颜色
     let fontsize = width / fontSizeRatio;  // 使用参数控制字体大小
     ctx.font = `bold ${fontsize}px "Segoe UI", sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetX = 2;
-    ctx.shadowOffsetY = 2;
+    ctx.shadowColor = 'rgba(255, 255, 255, 0.6)';
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
 	
 	// 处理多行文本
 	const lines = text.split('\n');

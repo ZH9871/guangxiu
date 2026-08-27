@@ -160,14 +160,23 @@ function make_rating(i) {
   }
 }
 
-// 图库图片列表
-const galleryImages = computed(() => {
-  return [...imageStore.uploads, ...imageStore.generated_statics]
-})
+// 图库选项卡
+const galleryTab = ref('uploads')
+
+// 图库图片列表（按选项卡分组）
+const uploadGalleryImages = computed(() => imageStore.uploads)
+const genStaticGalleryImages = computed(() => imageStore.generated_statics)
 
 // 系统广绣图库（前端静态图）
-const systemGalleryImages = computed(() => {
-  return imageStore.systemImages
+const systemGalleryImages = computed(() => imageStore.systemImages)
+
+// 当前选项卡对应的图片
+const activeGalleryImages = computed(() => {
+  switch (galleryTab.value) {
+    case 'gen_statics': return genStaticGalleryImages.value
+    case 'system': return systemGalleryImages.value
+    default: return uploadGalleryImages.value
+  }
 })
 
 import { nextTick } from 'vue'
@@ -183,16 +192,19 @@ import { nextTick } from 'vue'
           <span class="section-title">📁 图库（点击选择参考图）</span>
           <span class="toggle-icon">{{ galleryOpen ? '▾' : '▸' }}</span>
         </div>
-        <div v-show="galleryOpen" class="gallery-grid">
-          <div v-for="img in galleryImages" :key="img.id" class="gallery-item" @click="selected_change(img)">
-            <img :src="img.thumbnail" class="gallery-thumb" />
-            <div class="gallery-name">{{ img.name }}</div>
+        <div v-show="galleryOpen">
+          <!-- 选项卡切换按钮 -->
+          <div class="gallery-tabs">
+            <button class="gallery-tab-btn" :class="{ active: galleryTab === 'uploads' }"
+              @click="galleryTab = 'uploads'">上传图</button>
+            <button class="gallery-tab-btn" :class="{ active: galleryTab === 'gen_statics' }"
+              @click="galleryTab = 'gen_statics'">文生图</button>
+            <button class="gallery-tab-btn" :class="{ active: galleryTab === 'system' }"
+              @click="galleryTab = 'system'">系统广绣图库</button>
           </div>
-        </div>
-        <div v-show="galleryOpen" class="system-gallery">
-          <div class="system-gallery-label">🏛️ 系统广绣图库</div>
+          <!-- 滚动网格：固定高度，防止占据过大左侧高度 -->
           <div class="gallery-grid">
-            <div v-for="img in systemGalleryImages" :key="img.id" class="gallery-item" @click="selected_change(img)">
+            <div v-for="img in activeGalleryImages" :key="img.id" class="gallery-item" @click="selected_change(img)">
               <img :src="img.thumbnail" class="gallery-thumb" />
               <div class="gallery-name">{{ img.name }}</div>
             </div>
@@ -341,17 +353,32 @@ import { nextTick } from 'vue'
   border-bottom: 2px solid #e8f5e9;
   padding-bottom: 12px;
 }
-.system-gallery {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px dashed #cde5d3;
+.gallery-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
 }
-.system-gallery-label {
+.gallery-tab-btn {
+  background: #eef7ee;
+  border: none;
+  border: 1px solid transparent;
+  padding: 6px 14px;
+  border-radius: 20px;
+  cursor: pointer;
   font-size: 0.85rem;
-  font-weight: 600;
-  color: #5a8f72;
-  margin-bottom: 6px;
-  padding-left: 2px;
+  color: #4a7c63;
+  font-weight: 500;
+  transition: all 0.25s ease;
+  white-space: nowrap;
+}
+.gallery-tab-btn:hover {
+  background: #d9eed9;
+}
+.gallery-tab-btn.active {
+  background: #71ba94;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(113, 186, 148, 0.4);
 }
 .gallery-header {
   display: flex;
@@ -417,7 +444,7 @@ import { nextTick } from 'vue'
   width: 150px;
   height: 150px;
   object-fit: contain;
-  background: #f5f5f5;
+  background: #c7e9b8;  /* 与 TeachingHelper 预览区一致：浅绿背景 */
   border-radius: 12px;
   margin-top: 4px;
 }
