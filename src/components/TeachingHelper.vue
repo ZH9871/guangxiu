@@ -472,19 +472,37 @@
 		}
 		userStore.t_mask_s = true
 	}
-	// 执行一次“检测+分割”并展示进度
-	function autoSegment(id) {
+	// 后端是否已存在该图的检测/分割掩膜缓存（缓存在服务器侧,非浏览器）
+	async function hasCachedDetections(id) {
+		try {
+			const res = await api.get('detections/' + id)
+			const arr = res && Array.isArray(res.data) ? res.data : []
+			return arr.reduce((total, g) => total + (g.data ? g.data.length : 0), 0) > 0
+		} catch (e) {
+			return false
+		}
+	}
+	// 执行一次“检测+分割”并展示进度：若该图已有分割缓存则直接显示结果，不再向后端发分割请求
+	async function autoSegment(id) {
 		segLoading()
-		api.get('detections/update/' + id)
-			.then(() => {
+		try {
+			const cached = await hasCachedDetections(id)
+			if (cached) {
+				// 已有缓存：直接刷新覆盖层即显示结果，仅提示“分割完成”
 				get_image_detections(id)
 				load_user_detections()
 				segFinish()
-			})
-			.catch(e => {
-				console.error('目标检测与分割失败:', e)
-				segClear()
-			})
+				return
+			}
+			// 无缓存：真正触发后端检测与分割
+			await api.get('detections/update/' + id)
+			get_image_detections(id)
+			load_user_detections()
+			segFinish()
+		} catch (e) {
+			console.error('目标检测与分割失败:', e)
+			segClear()
+		}
 	}
 	// 本地上传尚未拿到后端真实 ID 前，开启开关后等待后台上传，拿到 ID 时再补跑一次
 	let pendingSegmentation = false
