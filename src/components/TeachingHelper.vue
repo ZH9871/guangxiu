@@ -188,6 +188,7 @@
 		}
 
 		await imageStore.load_full(image_info)
+		canvasHasImage.value = true
 
 		if (display_src.value == image_info.src) {
 			if (x1 == -1) {
@@ -353,6 +354,8 @@
 	const display_src = ref(generateImageWithText(w, h, '请从左侧上传\n或选择图片\n滚轮放大缩小\n右键拖动图片', 8))
 	const display_scale = ref(1)
 	const display_mask_scale = ref(1)
+	// 画布是否已真实展示过一帧图片（本地上传 data: 或图库 http）。默认见上面“请先…上传”占位，故非开图。
+	const canvasHasImage = ref(false)
 	// 掩膜覆盖层定位几何：与 canvas 完全一致（mask-wrap 坐标系内）
 	const maskImgRefs = ref([])
 	const mask_geom_left = ref(0)
@@ -448,13 +451,9 @@
 		clearTimeout(segToastTimer)
 		segToast.value = false
 	}
-	// 画布当前是否已打开真实图片：以画布 <img id="image"> 实际 src 为准（占位起始为 data:）
+	// 画布当前是否已打开真实图片：由 canvasHasImage 显式标记（图库 http 与本地上传 data: 均覆盖）
 	function imageOpenOnCanvas() {
-		if (image) {
-			const s = String(image.getAttribute('src') || image.src || '')
-			if (s && !s.startsWith('data:')) return true
-		}
-		return !!display_src.value && !String(display_src.value).startsWith('data:')
+		return canvasHasImage.value
 	}
 	// 显示自动分割开关 change：未打开图片则拦截并回弹；允许开启后才置 true 交给 watch 走分割流程
 	function onSegToggleChange(e) {
@@ -473,13 +472,8 @@
 		}
 		userStore.t_mask_s = true
 	}
-	// t_mask_s 被置 true：显示“正在分割”→请求检测/分割→成功后切为“分割完成”并自动消失
-	watch(() => userStore.t_mask_s, (val) => {
-		if (!val) { segClear(); return }
-		const id = userStore.t_selectedImageId
-		if (!id) return
-		const openImage = (image && String(image.getAttribute('src') || image.src || '')) || display_src.value
-		if (!openImage || String(openImage).startsWith('data:')) return   // 仍无真实图片则等开关弹回，不请求
+	// 执行一次“检测+分割”并展示进度
+	function autoSegment(id) {
 		segLoading()
 		api.get('detections/update/' + id)
 			.then(() => {
@@ -491,6 +485,27 @@
 				console.error('目标检测与分割失败:', e)
 				segClear()
 			})
+	}
+	// 本地上传尚未拿到后端真实 ID 前，开启开关后等待后台上传，拿到 ID 时再补跑一次
+	let pendingSegmentation = false
+	// t_mask_s 被置 true：等待/直接执行分割并显示进度
+	watch(() => userStore.t_mask_s, (val) => {
+		if (!val) {
+			pendingSegmentation = false
+			segClear()
+			return
+		}
+		const id = userStore.t_selectedImageId
+		if (!id) return
+		if (!canvasHasImage.value) return   // 未真实开图、开关将自动弹回，不请求
+		segLoading()
+		if (!id.startsWith('uploaded_') || uploadBackendResolved) {
+			// 图库图片或后端已返回真实 ID：直接跑分割
+			autoSegment(id)
+		} else {
+			// 本地上传刚显示、后台还在同步真实 ID：保持“正在分割”，等就绪后补跑
+			pendingSegmentation = userStore.t_mask_s
+		}
 	})
 
 	//后端上传是否已返回真实图片ID（避免本地临时ID覆盖真实ID）
@@ -1281,6 +1296,7 @@ function calculateMaskBoundingBoxFromCanvas() {
 	    img.onload = () => {
 	      // 将处理好的图片设置到显示区域
 	      display_src.value = e.target.result
+	      canvasHasImage.value = true
 	      
 	      // 重置画布和显示参数
 	      display_scale.value = 1
@@ -1344,6 +1360,11 @@ function calculateMaskBoundingBoxFromCanvas() {
 	    // 用后端真实ID替换本地临时ID，确保自动分割/检测使用正确的图
 	    userStore.t_selectedImageId = res.data.id
 	    uploadBackendResolved = true
+	    // 若用户在图片显示期间已打开“显示自动分割”而等待真实 ID，则此刻补跑分割流程
+	    if (pendingSegmentation && userStore.t_mask_s) {
+	      pendingSegmentation = false
+	      autoSegment(res.data.id)
+	    }
 	    try {
 	      await api.get('/detections/update/' + res.data.id)
 	    } catch (e) {}
@@ -1351,6 +1372,11 @@ function calculateMaskBoundingBoxFromCanvas() {
 	    return res.data.id
 	  } catch (e) {
 	    console.error('上传到服务器失败:', e)
+	    pendingSegmentation = false
+	    if (userStore.t_mask_s) {
+	      userStore.t_mask_s = false
+	      segClear()
+	    }
 	    notyf.error('上传到服务器失败')
 	    return null
 	  }
