@@ -12,9 +12,13 @@ import Register from "@/components/Register.vue";
 
 const routes = [
     {
-        path: '/',         // 访问路径
-        name: 'Home',      // 路由名称
-        component: Home    // 对应的组件
+        path: '/',         // 访问根路径时默认进入“走进广绣”
+        redirect: '/Guangxiu'
+    },
+    {
+        path: '/Home',     // 首页组件隐藏路由（导航不展示，仅预留给后续优化）
+        name: 'Home',
+        component: Home
     },
     {
         path: '/Teaching',

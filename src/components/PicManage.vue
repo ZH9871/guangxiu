@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { useImageStore, useUserStore, api } from '@/store'
+import { useImageStore, useUserStore, api, resolve_current_user } from '@/store'
 import SvgIcon from "@/components/Toolbox/SvgIcon.vue";
 import { download_image } from "@/tools.js";
 import ImageNameEditor from "@/components/Toolbox/ImageNameEditor.vue";
@@ -150,9 +150,8 @@ watch(activeCategory, () => {
 })
 
 // 初始加载数据
-api.get("/first_user_id").then(res => {
-  userStore.user_id = res.data
-  imageStore.update_image_infos(userStore.user_id).then(imageStore.load_thumbnails)
+resolve_current_user().then(uid => {
+  imageStore.update_image_infos(uid).then(imageStore.load_thumbnails)
 })
 imageStore.load_system_images()
 
@@ -220,11 +219,11 @@ async function processFile(file) {
 
       <!-- 上传图片控件（样式与 TeachingHelper 一致） -->
       <div class="container-upload">
-        <div class="upload-area" @click="triggerUpload" @drop.prevent="handleDrop" @dragover.prevent>
+        <div class="upload-area" data-guest-action @click="triggerUpload" @drop.prevent="handleDrop" @dragover.prevent>
           <div class="upload-icon">
             <span class="icon-unicode">📁</span>
           </div>
-          <p>点击上传刺绣图片或拖放文件到此处</p>
+          <p>点击上传图片或拖放文件到此处</p>
           <p class="hint-text">支持 JPG、PNG、WEBP格式</p>
           <input type="file" ref="fileInput" @change="handleFileUpload" style="display: none;" accept="image/*" />
         </div>
@@ -278,7 +277,7 @@ async function processFile(file) {
                 </button>
               </div>
               <!-- 图片 -->
-              <img :src="img.thumbnail" @click="previewImage(img)" class="grid-img" />
+              <img :src="img.thumbnail" @click="previewImage(img)" loading="lazy" decoding="async" class="grid-img" />
               <!-- 底部名称编辑 -->
               <div class="img-name">
                 <ImageNameEditor v-if="!img.is_system" :info="img" />

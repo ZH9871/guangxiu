@@ -6,21 +6,29 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "server": "node --disable-warning=ExperimentalWarning server/index.js",
+    "start": "npm run build && npm run server"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.11",
     "axios": "^1.10.0",
     "core-js": "^3.44.0",
     "daisyui": "^5.0.46",
+    "dotenv": "^17.0.0",
     "dropzone": "^6.0.0-beta.2",
     "element-plus": "^2.14.5",
+    "express": "^4.21.2",
+    "ffmpeg-static": "^5.2.0",
+    "multer": "^2.0.1",
     "pica": "^9.0.1",
     "pinia": "^3.0.3",
     "pinia-plugin-persistedstate": "^4.4.1",
+    "sharp": "^0.35.4",
     "tailwindcss": "^4.1.11",
     "vue": "^3.5.17",
-    "vue-router": "^4.5.1"
+    "vue-router": "^4.5.1",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.0",

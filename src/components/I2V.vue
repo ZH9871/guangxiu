@@ -1,20 +1,21 @@
 <script setup lang="ts">
-import { onMounted, ref, computed } from "vue";
-import { useImageStore, useUserStore, api, notyf } from '@/store'
+import { onMounted, onUnmounted, ref, computed } from "vue";
+import { useImageStore, useUserStore, api, notyf, resolve_current_user } from '@/store'
 import { download_image, generateImageWithText } from '@/tools'
 import GenMask2 from '@/components/Toolbox/GenMask.vue'
 import ImageNameEditor from "@/components/Toolbox/ImageNameEditor.vue";
 
 const userStore = useUserStore()
 const imageStore = useImageStore()
+// 进入页面时重置“生成中”遮罩（该状态被持久化，上次失败会残留）
+userStore.i2v_gen_mask = false
 
 // 图库折叠状态
 const galleryOpen = ref(true)
 
 // 初始化
-api.get("/first_user_id").then(res => {
-  userStore.user_id = res.data
-  imageStore.update_image_infos(userStore.user_id).then(imageStore.load_thumbnails)
+resolve_current_user().then(uid => {
+  imageStore.update_image_infos(uid).then(imageStore.load_thumbnails)
 })
 imageStore.load_system_images()
 
@@ -23,8 +24,11 @@ const ref_src = ref(generateImageWithText(600, 600, '请从左侧图库\n单击�
 const ref_id = ref("")
 
 function selected_change(item) {
+  // 无论上传图/文生图/系统广绣图库，先在下方绿色预览区立即显示所选图
+  ref_src.value = item.thumbnail
   if (item.is_system) {
-    // 系统图为前端静态图，先上传到后端 uploads 获得真实 id
+    // 系统图为前端静态图，无后端 id：需先上传到后端 uploads 获得真实 id 才能出图/生成提示词
+    ref_id.value = ""
     notyf.info('正在上传系统图...')
     selectedChangeSystem(item).then(() => {
       notyf.success('系统图已就绪')
@@ -32,7 +36,6 @@ function selected_change(item) {
     return
   }
   ref_id.value = item.id
-  ref_src.value = item.thumbnail
 }
 
 // 系统图上传后端并选中（获取真实id）
@@ -48,7 +51,6 @@ async function selectedChangeSystem(item) {
   const id = up.data.id
   await imageStore.update_image_infos(userStore.user_id)
   ref_id.value = id
-  ref_src.value = item.thumbnail
 }
 
 // AI 提示词
@@ -91,10 +93,10 @@ async function make() {
     }
   }, 40);
 
-  api.get(`i2v/${userStore.user_id}/${ref_id.value}/${userStore.i2v_hint}`).then(async (res) => {
+  api.get(`i2v/${userStore.user_id}/${ref_id.value}/${encodeURIComponent(userStore.i2v_hint)}`).then(async (res) => {
     let item = res.data
     item.selected = ref(false);
-    item.src = api.defaults.baseURL + "/video/src/" + item.id
+    item.src = api.defaults.baseURL.replace(/\/$/, '') + "/video/src/" + item.id
     let src_thumbnail = await imageStore.get_thumbnail(item.id);
     selected_g.value = item.src
     item.thumbnail = src_thumbnail
@@ -102,6 +104,12 @@ async function make() {
     userStore.i2v_gen_mask = false
     selected_g_changed(item)
     gen_process.value = 100
+  }).catch(() => {
+    // 生成失败时关闭“生成中”遮罩，否则提示图会一直显示
+    userStore.i2v_gen_mask = false
+    clearInterval(progressInterval)
+    gen_process.value = 0
+    notyf.error('视频生成失败，请重试')
   });
 }
 
@@ -119,8 +127,8 @@ async function selected_g_changed(item) {
   try {
     selected_g.value.selected = false
   } catch (e) { }
-  item.src = api.defaults.baseURL + "/video/src/" + item.id
-  video_src.value = api.defaults.baseURL + "/video/src/" + item.id
+  item.src = api.defaults.baseURL.replace(/\/$/, '') + "/video/src/" + item.id
+  video_src.value = api.defaults.baseURL.replace(/\/$/, '') + "/video/src/" + item.id
   selected_g.value = item
   item.selected = ref(true)
   rating.value = selected_g.value.rating
@@ -163,6 +171,20 @@ function make_rating(i) {
 // 图库选项卡
 const galleryTab = ref('uploads')
 
+// AI 风格下拉开关
+const styleOpen = ref(false)
+const styleWrap = ref(null)
+function pickStyle(s) {
+  userStore.i2v_style = s
+  styleOpen.value = false
+}
+function onDocClick(e) {
+  if (styleOpen.value && styleWrap.value && !styleWrap.value.contains(e.target)) {
+    styleOpen.value = false
+  }
+}
+onMounted(() => document.addEventListener('click', onDocClick))
+onUnmounted(() => document.removeEventListener('click', onDocClick))
 // 图库图片列表（按选项卡分组）
 const uploadGalleryImages = computed(() => imageStore.uploads)
 const genStaticGalleryImages = computed(() => imageStore.generated_statics)
@@ -203,7 +225,7 @@ import { nextTick } from 'vue'
               @click="galleryTab = 'system'">系统广绣图库</button>
           </div>
           <!-- 滚动网格：固定高度，防止占据过大左侧高度 -->
-          <div class="gallery-grid">
+          <div class="gallery-grid" data-guest-action>
             <div v-for="img in activeGalleryImages" :key="img.id" class="gallery-item" @click="selected_change(img)">
               <img :src="img.thumbnail" class="gallery-thumb" />
               <div class="gallery-name">{{ img.name }}</div>
@@ -224,14 +246,21 @@ import { nextTick } from 'vue'
       <div class="ai-section">
         <div class="section-title">AI 提示词生成</div>
         <div class="ai-header">
-          <button class="style-btn" popovertarget="style-popover">风格：{{ userStore.i2v_style }}</button>
-          <ul class="dropdown" popover id="style-popover">
-            <li @click="userStore.i2v_style='默认'">默认</li>
-            <li @click="userStore.i2v_style='优雅'">优雅</li>
-            <li @click="userStore.i2v_style='有趣'">有趣</li>
-          </ul>
-          <button class="refresh-btn" @click="get_hint">生成提示词</button>
-          <button class="refresh-btn" @click="get_hint">换一批</button>
+          <div class="style-wrap" ref="styleWrap">
+            <button class="style-btn" @click="styleOpen = !styleOpen">
+              风格：{{ userStore.i2v_style }} <span class="caret">▾</span>
+            </button>
+            <ul v-show="styleOpen" class="style-dropdown">
+              <li v-for="s in ['默认', '优雅', '有趣']" :key="s" class="style-option"
+                  :class="{ selected: userStore.i2v_style === s }"
+                  @click="pickStyle(s)">
+                <span class="opt-check">{{ userStore.i2v_style === s ? '✓' : '' }}</span>
+                <span class="opt-label">{{ s }}</span>
+              </li>
+            </ul>
+          </div>
+          <button class="action-btn" data-guest-action @click="get_hint">生成提示词</button>
+          <button class="action-btn" data-guest-action @click="get_hint">换一批</button>
         </div>
       </div>
 
@@ -241,7 +270,7 @@ import { nextTick } from 'vue'
         <textarea class="prompt-input" v-model="userStore.i2v_hint" rows="4" placeholder="请选择参考图后点击'生成提示词'，或手动输入"></textarea>
       </div>
 
-      <button class="generate-btn" @click="make">开始生成</button>
+      <button class="generate-btn" data-guest-action @click="make">开始生成</button>
     </div>
 
     <!-- 中间面板：视频 -->
@@ -268,7 +297,7 @@ import { nextTick } from 'vue'
 
         <div class="panel-footer">
           <div class="action-buttons">
-            <button class="action-btn save" @click="to_user_g">保存</button>
+            <button class="action-btn save" data-guest-action @click="to_user_g">保存</button>
             <button class="action-btn download" @click="download_g">下载</button>
             <button class="action-btn delete" @click="delete_g">删除</button>
             <button class="action-btn clear" @click="clear_g">全部清空</button>
@@ -467,25 +496,100 @@ import { nextTick } from 'vue'
 }
 .ai-header {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
 }
-.style-btn, .refresh-btn {
-  background: #e8f5e9;
+/* 三者等高、同一行对齐的公共按钮体型 */
+.style-btn,
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 16px;
   border: none;
-  padding: 6px 12px;
-  border-radius: 20px;
+  border-radius: 16px;
   cursor: pointer;
   font-size: 0.85rem;
-  text-decoration: none;
+  white-space: nowrap;
+  transition: all 0.2s ease;
 }
-.refresh-btn {
-  background: #d4edda;
+/* 风格下拉触发钮 —— 浅绿底 + 浅色描边，观感近似“选择框”，弱于操作按钮 */
+.style-wrap {
+  position: relative;
 }
-.refresh-btn:hover {
-  background: #b7e4c7;
+.style-btn {
+  position: relative;
+  gap: 6px;
+  background: #eef8ef;
+  color: #2e7d32;
+  font-weight: 600;
+  border: 1px solid #b6dcc0;
+}
+.style-btn .caret {
+  font-size: 0.62rem;
+  color: #79b889;
+}
+.style-btn:hover {
+  background: #e3f2e5;
+  border-color: #9ed0ab;
+}
+/* 生成提示词 / 换一批 —— 一致且更高的浅绿实底，突出“按钮”；与下拉区分 */
+.action-btn {
+  background: #9ed8aa;
+  color: #14532d;
+}
+.action-btn:hover {
+  background: #85cc94;
+  box-shadow: 0 2px 6px rgba(126, 194, 142, 0.25);
+}
+.action-btn:active {
+  transform: translateY(1px);
+}
+/* 风格下拉：紧贴风格按钮正下方显示 */
+.style-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  margin: 0;
+  padding: 6px;
+  min-width: 100%;
+  background: #ffffff;
+  border: 1px solid #e3ece3;
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.style-dropdown .style-option {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  margin: 2px 0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+.style-dropdown .style-option:hover {
+  background: #f1f8ef;
+}
+.style-dropdown .style-option.selected {
+  background: #e3f2e7;
+  color: #2e7d32;
+  font-weight: 600;
+}
+.style-dropdown .opt-check {
+  width: 16px;
+  flex-shrink: 0;
+  color: #4caf7a;
+  font-weight: 700;
 }
 .hint-list {
   max-height: 180px;

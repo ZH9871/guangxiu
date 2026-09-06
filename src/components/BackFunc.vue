@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { useImageStore,useUserStore,api } from '@/store'
+import { useImageStore,useUserStore,api,resolve_current_user } from '@/store'
 const userStore =useUserStore()
 const imageStore =useImageStore()
-api.get("/first_user_id").then(res => {
-  userStore.user_id=res.data
-  imageStore.update_image_infos(userStore.user_id).then(imageStore.load_thumbnails)
+resolve_current_user().then(uid => {
+  imageStore.update_image_infos(uid).then(imageStore.load_thumbnails)
 })
 async function save() {
   // 发起请求，明确设置 responseType 为 'arraybuffer'

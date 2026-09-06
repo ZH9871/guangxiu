@@ -5,6 +5,7 @@
 		toRaw,
 		computed,
 		onMounted,
+		onUnmounted,
 		watch,
 		nextTick
 	} from "vue";
@@ -12,13 +13,14 @@
 		useImageStore,
 		useUserStore,
 		api,
-		notyf
+		notyf,
+		resolve_current_user
 	} from '@/store'
+	import { ElMessage } from 'element-plus'
 	const userStore = useUserStore()
 	const imageStore = useImageStore()
-	api.get("/first_user_id").then(res => {
-		userStore.user_id = res.data
-		imageStore.update_image_infos(userStore.user_id).then(imageStore.load_thumbnails)
+	resolve_current_user().then(uid => {
+		imageStore.update_image_infos(uid).then(imageStore.load_thumbnails)
 		console.log("teachingreflash")
 		console.log(userStore.user_id)
 		console.log(imageStore.uploads)
@@ -57,10 +59,24 @@
 			}
 		}
 	})
+	onUnmounted(() => {
+		clearTimeout(segToastTimer)
+	})
 	//图片位置选择---------------------------------------------------------------
 	//获取位置检测数据
 	const user_detections = reactive([])
 	const image_detections = reactive([])
+	// 分类下拉中当前选中的分割图（用于高亮）
+	const activeUserBox = ref(null)
+	const activeImageBox = ref(null)
+	function pickBox(panel, ii) {
+		if (panel === 'user') activeUserBox.value = ii && ii.d_id
+		else activeImageBox.value = ii && ii.d_id
+	}
+	function isBoxActive(panel, ii) {
+		const cur = panel === 'user' ? activeUserBox.value : activeImageBox.value
+		return ii && cur != null && cur === ii.d_id
+	}
 
 	function sortByStar(a, b) { // 优先按 is_star 排序（true 在前）
 		if (b.is_star !== a.is_star) {
@@ -413,16 +429,70 @@
 	// 缩放或画布容器尺寸变化时重算 canvas 显示几何
 	watch(display_scale, () => updateCanvasGeometry());
 	// 显示自动分割：打勾时先对该图执行检测+分割，再刷新覆盖层显示
+	// 分割进度提示（右上角一个小白框：正在分割 loading / 分割完成 done 自动消失）
+	const segToast = ref(false)  // 是否显示提示
+	const segDone = ref(false)   // true=完成, false=正在分割
+	let segToastTimer = null
+	function segLoading() {
+		segDone.value = false
+		segToast.value = true
+		clearTimeout(segToastTimer)
+	}
+	function segFinish() {
+		segDone.value = true
+		segToast.value = true
+		clearTimeout(segToastTimer)
+		segToastTimer = setTimeout(() => { segToast.value = false }, 2500)
+	}
+	function segClear() {
+		clearTimeout(segToastTimer)
+		segToast.value = false
+	}
+	// 画布当前是否已打开真实图片：以画布 <img id="image"> 实际 src 为准（占位起始为 data:）
+	function imageOpenOnCanvas() {
+		if (image) {
+			const s = String(image.getAttribute('src') || image.src || '')
+			if (s && !s.startsWith('data:')) return true
+		}
+		return !!display_src.value && !String(display_src.value).startsWith('data:')
+	}
+	// 显示自动分割开关 change：未打开图片则拦截并回弹；允许开启后才置 true 交给 watch 走分割流程
+	function onSegToggleChange(e) {
+		const target = e && e.target
+		const isOn = !!(target && target.checked)
+		if (!isOn) {
+			userStore.t_mask_s = false
+			segClear()
+			return
+		}
+		if (!imageOpenOnCanvas()) {
+			if (target) target.checked = false
+			segClear()
+			ElMessage.warning({ message: '请先打开一张图片', duration: 2600, showClose: true })
+			return
+		}
+		userStore.t_mask_s = true
+	}
+	// t_mask_s 被置 true：显示“正在分割”→请求检测/分割→成功后切为“分割完成”并自动消失
 	watch(() => userStore.t_mask_s, (val) => {
-		if (!val || !userStore.t_selectedImageId) return
+		if (!val) { segClear(); return }
 		const id = userStore.t_selectedImageId
-		api.get("detections/update/" + id).then(() => {
-			get_image_detections(id)
-			load_user_detections()
-		}).catch(e => {
-			console.error('目标检测与分割失败:', e)
-		})
-	});
+		if (!id) return
+		const openImage = (image && String(image.getAttribute('src') || image.src || '')) || display_src.value
+		if (!openImage || String(openImage).startsWith('data:')) return   // 仍无真实图片则等开关弹回，不请求
+		segLoading()
+		api.get('detections/update/' + id)
+			.then(() => {
+				get_image_detections(id)
+				load_user_detections()
+				segFinish()
+			})
+			.catch(e => {
+				console.error('目标检测与分割失败:', e)
+				segClear()
+			})
+	})
+
 	//后端上传是否已返回真实图片ID（避免本地临时ID覆盖真实ID）
 	let uploadBackendResolved = false;
 	//右键拖动
@@ -1447,7 +1517,7 @@ function calculateMaskBoundingBoxFromCanvas() {
 	    // 处理响应
 	    if (response.data.image_url) {
 	      // 显示针法地图
-	      const fullImageUrl = `http://127.0.0.1:5000${response.data.image_url}?t=${Date.now()}`
+	      const fullImageUrl = `${api.defaults.baseURL.replace(/\/$/, '')}${response.data.image_url}?t=${Date.now()}`
 	      console.log('加载针法地图URL:', fullImageUrl)
 	      
 	      display_src.value = fullImageUrl
@@ -1502,7 +1572,7 @@ function calculateMaskBoundingBoxFromCanvas() {
 	      console.log('当前图片ID:', imageId)
 	      
 	      // 第一步：先尝试直接加载已存在的针法地图
-	      const stitchMapUrl = `http://127.0.0.1:5000/get_segment_map/${imageId}?t=${Date.now()}`
+	      const stitchMapUrl = `${api.defaults.baseURL.replace(/\/$/, '')}/get_segment_map/${imageId}?t=${Date.now()}`
 	      console.log('尝试加载针法地图URL:', stitchMapUrl)
 	      
 	      // 使用Image对象预加载测试图片是否存在
@@ -1557,6 +1627,12 @@ function calculateMaskBoundingBoxFromCanvas() {
 <template>
 	<!-- 三栏布局 -->
 	<div class="three-column-layout">
+		<!-- 自动分割进度提示（右上角小白框：正在分割 loading / 分割完成 done，样式统一） -->
+		<div v-if="segToast" class="seg-toast">
+			<img class="seg-toast-icon" :class="!segDone ? 'spin' : ''"
+				:src="segDone ? '/finish.svg' : '/loading.svg'" alt="" />
+			<span>{{ segDone ? '分割完成' : '正在分割中，请耐心等待返回结果…' }}</span>
+		</div>
 		<!--  左侧	-->
 		<div class="left-panel left-column">
 			
@@ -1573,7 +1649,7 @@ function calculateMaskBoundingBoxFromCanvas() {
 				<div v-show="userStore.t_selector_index==0">
 					<!-- 上传图片文件控件 -->
 					<div class="container-upload">
-					    <div class="upload-area" @click="triggerUpload" @drop.prevent="handleDrop" @dragover.prevent>
+					    <div class="upload-area" data-guest-action @click="triggerUpload" @drop.prevent="handleDrop" @dragover.prevent>
 					      <div class="upload-icon">
 					        <span class="icon-unicode">📁</span>
 					      </div>
@@ -1591,7 +1667,7 @@ function calculateMaskBoundingBoxFromCanvas() {
 						
 						<!-- 选择图片控件 -->
 						<div class="flex justify-center items-center" style="">
-						    <button class="gradient-btn btn text-white" @click="imageSelector.openModal()">
+						    <button class="gradient-btn btn text-white" data-guest-action @click="imageSelector.openModal()">
 								从图库中选择
 						    </button>
 						</div>
@@ -1607,11 +1683,11 @@ function calculateMaskBoundingBoxFromCanvas() {
 						<ul class="right_ui">
 							<li><input type="checkbox" v-model="userStore.t_auto_classify" class="toggle">
 							自动针法识别</li>
-							<li><input type="checkbox" v-model="userStore.t_mask_s" class="toggle">显示自动分割</li>
+							<li><input type="checkbox" :checked="userStore.t_mask_s" class="toggle" @change="onSegToggleChange">显示自动分割</li>
 						</ul>
 						<ul class="right_ui">
-							<li><div class="action-btn save" @click="classify" style="width: 100%;">针法识别</div></li>
-							<li><div class="action-btn download" @click="segment_box()" style="width: 100%;">目标分割</div></li>
+							<li><div class="action-btn save" data-guest-action @click="classify" style="width: 100%;">针法识别</div></li>
+							<li><div class="action-btn download" data-guest-action @click="segment_box()" style="width: 100%;">目标分割</div></li>
 						</ul>
 						
 						<!-- 针法识别结果 -->
@@ -1625,24 +1701,33 @@ function calculateMaskBoundingBoxFromCanvas() {
 			</div>
 				
 
-				<div v-show="userStore.t_selector_index==1">
+				<div v-show="userStore.t_selector_index==1" class="overflow-auto h-full">
 					<div v-for="item in image_detections">
-						<div class="divider btn btn-ghost text-lg" style="margin: 10px;"
-							@click="item.expanded=!item.expanded">{{ item.name }}</div>
-						<ul v-show="item.expanded" v-for="(ii,index) in item.pos"
-							class="list bg-base-100 rounded-box shadow-md">
-							<li class="list-row" @click="selected_change(ii['id'],ii['x1'],ii['y1'],ii['x2'],ii['y2'])">
-
-								<img :src="ii.src" style="max-width: 60px;max-height: 60px">
-								<div>{{ii.name}}{{index+1}}</div>
-								<button class="btn-show" style="width: 20px;height: 20px;cursor: pointer;"
-									@click.stop="toggleStar(ii)">
-									<SvgIcon :name="ii.is_star ? 'star_full' : 'star'"
-										style="height: 30px;width: 30px;fill: yellow" />
-								</button>
-							</li>
-
-						</ul>
+						<div class="collapse collapse-arrow border border-base-300 bg-base-100 rounded-box">
+							<input type="checkbox" v-model="item.expanded" />
+							<div class="collapse-title text-xl font-medium">
+								<p style="transform: translateY(-2px) translateX(20px)">{{ item.name }}</p>
+							</div>
+							<div class="collapse-content">
+								<div class="flex flex-col gap-2 px-1 pt-1" style="min-height: 0;">
+									<div v-show="item.expanded" v-for="(ii,index) in item.pos"
+										class="gallery-item"
+										:class="{ active: isBoxActive('image', ii) }"
+										@click="pickBox('image', ii); selected_change(ii['id'],ii['x1'],ii['y1'],ii['x2'],ii['y2'])">
+										<img :src="ii.src" class="gallery-thumb" />
+										<span class="gallery-name">{{ ii.name }}{{ index + 1 }}</span>
+										<button class="btn-show star"
+											:class="{ starred: ii.is_star }"
+											:title="ii.is_star ? '取消收藏' : '收藏'"
+											@click.stop="toggleStar(ii)">
+											<SvgIcon
+												:color="ii.is_star ? '#ffd700' : 'currentColor'"
+												:name="ii.is_star ? 'star_full' : 'star'" />
+										</button>
+									</div>
+								</div>
+							</div>
+						</div>
 					</div>
 				</div>
 
@@ -1657,21 +1742,22 @@ function calculateMaskBoundingBoxFromCanvas() {
 									<p style="transform: translateY(-2px) translateX(20px)">{{ item.name }}</p>
 								</div>
 								<div class="collapse-content">
-									<div class="flex flex-col" style="background: #d1d1d1;">
-										<ul v-show="item.expanded" v-for="(ii,index) in item.pos"
-											class="list bg-base-100 rounded-box shadow-md">
-											<li class="list-row"
-												@click="selected_change(ii['id'],ii['x1'],ii['y1'],ii['x2'],ii['y2'])">
-												<img :src="ii.src" style="max-width: 60px;max-height: 60px">
-												<div>{{ii.name}}{{index+1}}</div>
-												<button class="btn-show"
-													style="width: 20px;height: 20px;cursor: pointer;"
-													@click.stop="toggleStar(ii)">
-													<SvgIcon :name="ii.is_star ? 'star_full' : 'star'"
-														style="height: 30px;width: 30px;fill: yellow" />
-												</button>
-											</li>
-										</ul>
+									<div class="flex flex-col gap-2 px-1 pt-1" style="min-height: 0;">
+										<div v-show="item.expanded" v-for="(ii,index) in item.pos"
+											class="gallery-item"
+											:class="{ active: isBoxActive('user', ii) }"
+											@click="pickBox('user', ii); selected_change(ii['id'],ii['x1'],ii['y1'],ii['x2'],ii['y2'])">
+											<img :src="ii.src" class="gallery-thumb" />
+											<span class="gallery-name">{{ ii.name }}{{ index + 1 }}</span>
+											<button class="btn-show star"
+												:class="{ starred: ii.is_star }"
+												:title="ii.is_star ? '取消收藏' : '收藏'"
+												@click.stop="toggleStar(ii)">
+												<SvgIcon
+													:color="ii.is_star ? '#ffd700' : 'currentColor'"
+													:name="ii.is_star ? 'star_full' : 'star'" />
+											</button>
+										</div>
 									</div>
 								</div>
 							</div>
@@ -1734,7 +1820,7 @@ function calculateMaskBoundingBoxFromCanvas() {
 
 				<div class="panel-footer">
 					<div class="action-buttons">
-						<button class="action-btn save" @click="to_user_segments">保存</button>
+						<button class="action-btn save" data-guest-action @click="to_user_segments">保存</button>
 						<button class="action-btn download" @click="download_segment">下载</button>
 						<button class="action-btn delete" @click="delete_segmentation">删除</button>
 						<div class="action-btn clear" @click="clear_segmentations">全部清空</div>
@@ -1772,6 +1858,42 @@ function calculateMaskBoundingBoxFromCanvas() {
 </template>
 
 <style scoped>
+	/* 自动分割进度提示框 */
+	.seg-toast {
+		position: fixed;
+		top: 74px;
+		right: 24px;
+		z-index: 300;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		background: #ffffff;
+		color: #333333;
+		font-size: 14px;
+		font-weight: 600;
+		padding: 10px 16px;
+		border-radius: 10px;
+		white-space: nowrap;
+		border: 1px solid #e0e0e0;
+		box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+	}
+	.seg-toast.done {
+		color: #1e7e34;
+		border-color: #bfe6c6;
+	}
+	.seg-toast-icon {
+		width: 20px;
+		height: 20px;
+		flex-shrink: 0;
+	}
+	/* 分割中：loading.svg 原色持续旋转，与右侧文字同屏 */
+	.seg-toast-icon.spin {
+		animation: segToastSpin 1s linear infinite;
+	}
+	@keyframes segToastSpin {
+		from { transform: rotate(0deg); }
+		to { transform: rotate(360deg); }
+	}
 	.hover-red:hover {
 		filter: brightness(0.5) sepia(1) hue-rotate(-50deg) saturate(5);
 	}
@@ -2081,7 +2203,9 @@ function calculateMaskBoundingBoxFromCanvas() {
 	.gallery-thumb {
 		width: 55px;
 		height: 55px;
-		object-fit: cover;
+		object-fit: contain; /* 完整显示分割图全貌，外容器尺寸保持一致 */
+		object-position: center;
+		background: #eef3ee;
 		border-radius: 8px;
 		flex-shrink: 0;
 	}
@@ -2250,5 +2374,50 @@ function calculateMaskBoundingBoxFromCanvas() {
 	
 	.gradient-btn:hover::after {
 	  left: 100%;
+	}
+
+	/* ---- 列表行内收藏按钮（圆形半透明，参考 PicManage .act） ---- */
+	.btn-show.star {
+	  width: 24px;
+	  height: 24px;
+	  padding: 0;
+	  border: none;
+	  border-radius: 50%;
+	  background: rgba(255, 255, 255, 0.75);
+	  color: rgba(0, 0, 0, 0.55);
+	  display: inline-flex;
+	  align-items: center;
+	  justify-content: center;
+	  cursor: pointer;
+	  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+	  transition: all 0.2s ease;
+	}
+	.btn-show.star :deep(.svg-container) {
+	  width: 16px;
+	  height: 16px;
+	  display: inline-flex;
+	}
+	.btn-show.star :deep(.svg-icon) {
+	  width: 100%;
+	  height: 100%;
+	}
+	.btn-show.star.starred {
+	  background: #fff7d6;
+	}
+	.btn-show.star.starred :deep(.svg-icon) {
+	  fill: #ffd700 !important;
+	  stroke: #ffd700 !important;
+	}
+	.btn-show.star:hover {
+	  background: #fff3cd;
+	  color: #d4a017;
+	  transform: scale(1.1);
+	}
+	/* 分类下拉内的分割图行（复用右侧 gallery-item 观感） */
+	.gallery-item:hover {
+	  background: #ececec;
+	}
+	.gallery-item .gallery-name {
+	  font-size: 0.8rem;
 	}
 </style>

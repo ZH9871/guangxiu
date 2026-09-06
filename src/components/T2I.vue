@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { ref,reactive,toRaw ,computed, onMounted,  watch} from "vue";
-import { useImageStore,useUserStore,api ,notyf} from '@/store'
+import { useImageStore,useUserStore,api ,notyf,resolve_current_user} from '@/store'
 const userStore =useUserStore()
 const imageStore =useImageStore()
-api.get("/first_user_id").then(res => {
-  userStore.user_id=res.data
-  imageStore.update_image_infos(userStore.user_id).then(imageStore.load_thumbnails)
+resolve_current_user().then(uid => {
+  imageStore.update_image_infos(uid).then(imageStore.load_thumbnails)
 })
 import {example_poetrys, poetry_categories} from '@/store'
 import GenMask from '@/components/Toolbox/GenMask.vue'
@@ -124,22 +123,30 @@ async function make(){
   };
   console.log(data);
   const dd="asdsadasfasdfsd"
-  const response=await api.post(`t2i/${userStore.user_id}/${dd}`, data, {
-    headers: {
-      'Content-Type': 'application/json'
-    }
-  })
-  let item=response.data
-  console.log("文生图返回值",item)
-  item.selected=ref(false);
-  let src_data= await imageStore.get_full(item.id);
-  let src_thumbnail= await imageStore.get_thumbnail(item.id);
-  item.src=src_data
-  selected_g.value=src_data
-  item.thumbnail=src_thumbnail
-  imageStore.temp_generated_statics.unshift(item)
-  selected_g_changed(item)
-  gen_process.value=100
+  try {
+    const response=await api.post(`t2i/${userStore.user_id}/${dd}`, data, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+    let item=response.data
+    console.log("文生图返回值",item)
+    item.selected=ref(false);
+    let src_data= await imageStore.get_full(item.id);
+    let src_thumbnail= await imageStore.get_thumbnail(item.id);
+    item.src=src_data
+    selected_g.value=src_data
+    item.thumbnail=src_thumbnail
+    imageStore.temp_generated_statics.unshift(item)
+    selected_g_changed(item)
+    gen_process.value=100
+  } catch (e) {
+    // 生成失败时关闭“生成中”遮罩，否则提示图会一直显示
+    userStore.t2i_gen_mask=false
+    clearInterval(progressInterval)
+    gen_process.value=0
+    notyf.error('图片生成失败，请重试')
+  }
 }
 const  rating=ref(0)
 function make_rating(i){
@@ -329,7 +336,7 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <button class="generate-btn" @click="make">开始生成</button>
+      <button class="generate-btn" data-guest-action @click="make">开始生成</button>
     </div>
 
     <!-- 中间面板：图片 -->
@@ -358,7 +365,7 @@ onUnmounted(() => {
 
         <div class="panel-footer">
           <div class="action-buttons">
-            <button class="action-btn save" @click="to_user_g">保存</button>
+            <button class="action-btn save" data-guest-action @click="to_user_g">保存</button>
             <button class="action-btn download" @click="download_g">下载</button>
             <button class="action-btn delete" @click="delete_g">删除</button>
             <button class="action-btn clear" @click="clear_g">全部清空</button>
@@ -429,7 +436,7 @@ onUnmounted(() => {
           <!-- 弹窗底部 -->
           <div class="poem-modal-footer">
               <button @click="closePoemModal" class="poem-modal-confirm">
-                  <i class="fa fa-check mr-2"></i>确定
+                  确定
               </button>
           </div>
       </div>
@@ -476,7 +483,7 @@ onUnmounted(() => {
   min-width: 0;
   height: 100%;
   overflow-y: auto;
-  padding-top: 16px;
+  padding-top: 12px;
 }
 
 .right-panel {

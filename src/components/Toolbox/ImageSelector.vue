@@ -29,6 +29,7 @@
                :class="{ 'selected': selectedImage?.id === item.id }"
                @click="selectImage(item)">
             <img :src="item.thumbnail" :alt="item.name"
+                 loading="lazy" decoding="async"
                  class="image-thumb" />
             <div class="checkmark">✓</div>
           </div>
@@ -41,6 +42,7 @@
                :class="{ 'selected': selectedImage?.id === item.id }"
                @click="selectImage(item)">
             <img :src="item.thumbnail" :alt="item.name"
+                 loading="lazy" decoding="async"
                  class="image-thumb" />
             <div class="checkmark">✓</div>
           </div>
@@ -53,6 +55,7 @@
                :class="{ 'selected': selectedImage === item }"
                @click="selectImage(item)">
             <img :src="item.thumbnail" :alt="item.name"
+                 loading="lazy" decoding="async"
                  class="image-thumb" />
             <div class="checkmark">✓</div>
           </div>
@@ -62,8 +65,8 @@
 
       <!-- 弹窗底部 -->
       <div class="img-modal-footer">
-        <button class="img-modal-confirm" @click="confirmSelection" :disabled="!selectedImage">
-          <i class="fa fa-check mr-2"></i>确定
+        <button class="img-modal-confirm" data-guest-action @click="confirmSelection" :disabled="!selectedImage">
+          确定
         </button>
       </div>
     </div>

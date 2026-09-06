@@ -1,7 +1,7 @@
 <template>
   <div class="guangxiu-page">
-    <!-- ========== 上半部分：Element Plus 卡片走马灯 ========== -->
-    <section class="carousel-section">
+    <!-- ========== 上半部分：Element Plus 卡片走马灯（可切换显示） ========== -->
+    <section v-if="showCarousel" class="carousel-section">
       <el-carousel
         type="card"
         :interval="5000"
@@ -48,7 +48,18 @@
       </div>
 
       <div class="content-display">
-        <h1 class="page-h1">{{ activeSub.label }}</h1>
+        <div class="header-row">
+          <h1 class="page-h1">{{ activeSub.label }}</h1>
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            @click="toggleCarousel"
+            class="toggle-carousel-btn"
+          >
+            {{ showCarousel ? '收起轮播图' : '展开轮播图' }}
+          </el-button>
+        </div>
         <div class="content-body" v-html="displayContent"></div>
       </div>
     </section>
@@ -57,19 +68,66 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { ElButton } from 'element-plus'
 
 // ---------- 轮播图片数据（路径使用 public_imgs） ----------
 const images = [
-  { src: '/public_imgs/gx1.jpg', alt: '广绣作品1' },
+  { src: '/public_imgs/gx1.png', alt: '广绣作品1' },
   { src: '/public_imgs/gx2.png', alt: '广绣作品2' },
-  { src: '/public_imgs/gx3.jpg', alt: '广绣作品3' },
+  { src: '/public_imgs/gx3.png', alt: '广绣作品3' },
   { src: '/public_imgs/gx4.jpg', alt: '广绣作品4' },
-  { src: '/public_imgs/gx5.jpg', alt: '广绣作品5' },
+  { src: '/public_imgs/gx5.png', alt: '广绣作品5' },
 ]
+
+const showCarousel = ref(true)
+
+const toggleCarousel = () => {
+  showCarousel.value = !showCarousel.value
+}
 
 const handleCarouselChange = (newIndex, oldIndex) => {
   // 可选：监听切换事件
 }
+
+// ========== 书籍数据（20种广绣相关著作） ==========
+const booksData = [
+  { id: 1, title: '广绣(岭南特色工艺非遗传承经典)', author: '肖明、蔡玉真', press: '暨南大学出版社' },
+  { id: 2, title: '中国广绣传统图案', author: '丁敏', press: '中国纺织出版社' },
+  { id: 3, title: '传统广绣针法工艺全集', author: '胡大芬、广州绣品工艺厂有限公司', press: '中国轻工业出版社' },
+  { id: 4, title: '广绣教程', author: '广州市非物质文化遗产保护中心、广州绣品工艺厂有限公司', press: '人民出版社' },
+  { id: 5, title: '万缕金丝：广州刺绣', author: '龚伯洪', press: '广东教育出版社' },
+  { id: 6, title: '广州刺绣针法', author: '广州市工艺美术研究所', press: '广东人民出版社' },
+  { id: 7, title: '广绣：丝路锦绣', author: '粤雅小丛书编委会', press: '南方日报出版社' },
+  { id: 8, title: '广州绣品', author: '广府文库、曾应枫', press: '广东人民出版社' },
+  { id: 9, title: '广绣基础教程', author: '何婷', press: '湖南教育出版社' },
+  { id: 10, title: '粤绣（中国刺绣图案集锦）', author: '邵黎明', press: '上海人民美术出版社' },
+  { id: 11, title: '传统广绣美学', author: '胡大芬、雷动', press: '中国轻工业出版社' },
+  { id: 12, title: '广绣', author: '陈少芳', press: '暨南大学出版社' },
+  { id: 13, title: '中国绣娘·粤绣', author: '陈逸芸', press: '电子工业出版社' },
+  { id: 14, title: '传统工艺课堂之广绣（教师用书）', author: '广东民间工艺博物馆', press: '广州出版社' },
+  { id: 15, title: '传统工艺课堂之广绣（学生用书）', author: '广东民间工艺博物馆', press: '广州出版社' },
+  { id: 16, title: '20世纪岭南粤绣发展史', author: '杨晓旗', press: '广州出版社' },
+  { id: 17, title: '潮玩粤绣', author: '广东省非遗保护中心、何定怡', press: '岭南美术出版社' },
+  { id: 18, title: '锦绣岭南 广东刺绣', author: '黄柏莉', press: '广东教育出版社' },
+  { id: 19, title: '非遗玩家·广绣（全三册）', author: '许春恒', press: '广东人民出版社' },
+  { id: 20, title: '广东省志·丝绸志', author: '地方志编纂委员会', press: '广东人民出版社' },
+]
+
+// 生成书籍网格 HTML
+function generateBookGrid(books) {
+  return `<div class="book-grid">${books.map(book => `
+    <div class="book-item">
+      <img src="/book_imgs/book${book.id}.png" alt="《${book.title}》" loading="lazy" />
+      <div class="book-info">
+        <div class="book-title">《${book.title}》</div>
+        <div class="book-author">${book.author}</div>
+        <div class="book-press">${book.press}</div>
+      </div>
+    </div>
+  `).join('')}</div>`
+}
+
+const bookGridHTML = generateBookGrid(booksData)
 
 // ---------- 栏目数据 ----------
 const sections = [
@@ -121,12 +179,13 @@ const sections = [
       { id: 'history_trade', label: '内销与外销', content: `
           <p>内销方面，广绣广泛服务于宫廷、官府与民间的服饰及生活用品，纹样以龙凤、孔雀、花鸟为主，注重吉祥寓意。</p>
           <p>外销方面，清代"一口通商"时期荷兰、英国、美国等商船大量采购"洋庄货"，广绣按西洋画稿和客户要求生产，出现风景油画、贵族人物肖像、欧洲建筑题材等"来样加工"制品，带动了广州及周边城乡绣业繁荣。</p>
-          <p>广绣的外销路线主要经由广州十三行商馆出口欧洲。广州十三行设有专营刺绣的商铺，与外销画、外销瓷等共同构成了清代西方"中国风"审美的一环。</p>
+          <p>广绣的外销规模极为可观。据记载，1900年经粤海关出口的绣品价值就达到49.67万两白银；大披肩作为广绣的明星产品在欧洲广受追捧，1772年前后仅在欧洲销量已达8万条，至1776年仅英格兰公司一家便销售了10.4万条，1822至1826年间出口至美国的披肩更是高达88.8万条。庞大的订单有力地推动了本土产业发展，乾隆年间广州已有绣坊、绣庄50余家，从业人员达三千人（当时仅计男工），且历经三个世纪，广绣大披肩至今仍然源源不断地输往欧洲。</p>
+          <p>广绣的外销路线主要经由广州十三行商馆出口欧洲。广州十三行设有专营刺绣的商铺，与外销画、外销瓷等共同构成了清代西方"中国风"审美的一环。除了巨大的经济价值，广绣更是广府文化集大成者，它见证了广州人包容开放的特质，在频繁的中西碰撞中诞生了诸如"粤式英语"等融合现象，甚至影响了近代国际语言。凭借极强的实用与创新属性，广绣以民间艺术交流的形式赢得了世界的认同，这股席卷全球的"中国风"，使广绣被国际舆论誉为"中国送给西方的礼物"。</p>
         ` },
       { id: 'history_modern', label: '近现代传承', content: `
-          <p>民国时期广绣因战乱、外销萎缩和机器西服冲击而衰落。</p>
-          <p>新中国成立后刺绣工艺得到抢救整理，广绣艺术创作一度恢复繁荣，涌现出大批名家名作。</p>
-          <p>改革开放后广绣进入博物馆收藏热与城镇化进程中的失传危机并存的阶段。21世纪国潮复兴背景下，广绣通过文创、国风服饰、非遗研学等方式重新走入大众视野。</p>
+          <p>在近现代初期，尤其是20世纪中叶以后，广绣不可避免地遭遇了严峻的发展困境和行业衰落。随着时代变迁、传统生活方式被现代工业化冲击，加之战乱以及计划经济时期对高端手工艺品的需求锐减，广绣的海外订单骤然骤减，广绣厂也面临改制和转型的巨大压力。更致命的是，广绣长期依赖于精雕细琢的师徒传承模式，绣制过程耗时极长、收入回报相对较慢且工作枯燥辛苦，这就导致在追求快节奏和经济效益的现代社会中，愿意沉淀下来学习这门技艺的年轻人大幅萎缩，老一辈年事已高的刺绣大师面临"后继乏人"的窘迫，不少极其珍贵、带有地方特色的传统针法和经典图样甚至面临着失传的危机，广绣行业一度陷入了极度低迷的沉寂期。</p>
+          <p>正是在这种濒临断代的危急关头，2006年广绣被正式列入第一批国家级非物质文化遗产代表性项目名录，这对广绣的存续具有里程碑式的深远意义。它不仅仅是一项官方荣誉，更是国家层面为这项古老手艺构建起了一道强有力的"保护屏障"。入选非遗后，广绣的地位从单纯的地方民间工艺，跃升为中华优秀传统文化的重要代表，这直接促使各级政府设立专项资金对广绣进行抢救性挖掘、整理和记录，并为那些身怀绝技的传承人评定专门的技术职称和荣誉，切实改善了从业者的生存状况，更重要的是极大提升了社会的文化自信与关注度，让广绣重新走进了公众的视野。</p>
+          <p>进入当代，广绣的保护与创新发展也呈现出前所未有的蓬勃生机。在坚守传统精湛技法的基础上，广绣的传承人和设计师们开启了大胆的"跨界破圈"之路。一方面，他们将广绣富丽明艳的色彩和丝光绒线的质感，巧妙地融入到现代时装、国潮品牌、高端家居软装，甚至是游戏皮肤和奢侈品牌的联名设计中，让非遗不再是挂在博物馆里的老古董，而是成为日常穿戴和使用的潮流单品。另一方面，数字科技也深度介入保护工作，通过3D扫描、高清数字化建档等方式，将散落民间的古广绣残片和濒危针法永久保存；同时，短视频直播、电商带货等新传播渠道，又为广绣打开了无远弗届的销售和展示平台，吸引了大量年轻受众。虽然今天广绣在全面商业化和保持极致的纯艺术造诣之间仍需不断探索平衡，但它已然成功走出了一条"守正创新"的复苏之路，在新时代展现出强大的生命力。</p>
         ` },
     ]
   },
@@ -136,34 +195,57 @@ const sections = [
     subs: [
       { id: 'prod_tools', label: '制作工具', content: `
           <p>广绣工具与针法配合紧密，种类繁多的针具决定了一幅绣品能否细腻传神。传统广绣工具主要包括以下几类。</p>
-          <div class="figure-group">
-            <figure><img src="/intro_imgs/image4.png" alt="绣针"><figcaption class="img-caption">精细绣针</figcaption></figure>
-            <figure><img src="/intro_imgs/image5.png" alt="绷架"><figcaption class="img-caption">传统绷架</figcaption></figure>
-            <figure><img src="/intro_imgs/image6.png" alt="剪刀"><figcaption class="img-caption">刺绣小剪</figcaption></figure>
-          </div>
           <h3>主要工具一览</h3>
-          <table class="tool-table">
-            <thead>
-              <tr><th>工具</th><th>用途</th></tr>
-            </thead>
-            <tbody>
-              <tr><td>绣花针</td><td>依绣线粗细选用，花色针极细，用于面部等精细部位。</td></tr>
-              <tr><td>绷架</td><td>固定绣布，分圆绷与方绷，保证绣面平整不浆皱。</td></tr>
-              <tr><td>剪刀</td><td>尖端微翘的专用剪，紧贴布面断线，便于平绣。</td></tr>
-              <tr><td>顶针</td><td>推动穿针，减少手部疲劳，利于连针密绣。</td></tr>
-              <tr><td>锥子</td><td>开孔穿金银线，用于钉线绣等厚实工艺。</td></tr>
-            </tbody>
-          </table>
-          <div class="figure-group">
-            <figure><img src="/intro_imgs/image7.png" alt="顶针"><figcaption class="img-caption">顶针</figcaption></figure>
-            <figure><img src="/intro_imgs/image8.png" alt="锥子"><figcaption class="img-caption">锥子与穿线</figcaption></figure>
-            <figure><img src="/intro_imgs/image9.png" alt="打样工具"><figcaption class="img-caption">描稿打样工具</figcaption></figure>
-          </div>
-          <div class="figure-group">
-            <figure><img src="/intro_imgs/image10.png" alt="绕线板"><figcaption class="img-caption">绕线板</figcaption></figure>
-            <figure><img src="/intro_imgs/image11.png" alt="绣线整理"><figcaption class="img-caption">绣线整理</figcaption></figure>
-            <figure><img src="/intro_imgs/image12.png" alt="工具箱"><figcaption class="img-caption">绣艺工具箱</figcaption></figure>
-          </div>
+          <ol>
+            <li>
+              <strong>架身（木方）：</strong>两根长约120cm、宽5cm的木方，中间有夹槽用于嵌入绣地，两端凸眼用于插入横担。
+              <div class="single-figure"><figure><img src="/intro_imgs/image4.png" alt="架身（木方）"><figcaption class="img-caption">架身（木方）</figcaption></figure></div>
+            </li>
+            <li>
+              <strong>横担（横头）：</strong>两根长约80cm的扁木条，上有榫孔，通过螺钉调节绣架长短。
+              <div class="single-figure"><figure><img src="/intro_imgs/image5.png" alt="横担（横头）"><figcaption class="img-caption">横担（横头）</figcaption></figure></div>
+            </li>
+            <li>
+              <strong>螺钉：</strong>4枚圆锥形钉头，插入横担榫孔固定。
+              <div class="single-figure"><figure><img src="/intro_imgs/image6.png" alt="螺钉"><figcaption class="img-caption">螺钉</figcaption></figure></div>
+            </li>
+            <li>
+              <strong>边竹：</strong>两根圆竹（直径约0.8cm），一端系棉线，用于绷紧绣地两边。
+              <div class="single-figure"><figure><img src="/intro_imgs/image7.png" alt="边竹"><figcaption class="img-caption">边竹</figcaption></figure></div>
+            </li>
+            <li>
+              <strong>边带：</strong>宽约1cm的带子，往返于横担和边竹之间，横向绷开绣地。
+              <div class="single-figure"><figure><img src="/intro_imgs/image8.png" alt="边带"><figcaption class="img-caption">边带</figcaption></figure></div>
+            </li>
+            <li>
+              <strong>绷架脚：</strong>一对椅凳（高约80cm），支撑绷架。
+              <div class="single-figure"><figure><img src="/intro_imgs/image9.png" alt="绷架脚"><figcaption class="img-caption">绷架脚</figcaption></figure></div>
+            </li>
+            <li><strong>花凳：</strong>刺绣者坐的凳子，尺寸以舒适为宜。</li>
+            <li>
+              <strong>小木凿：</strong>斧头形木凿，用于将绣地和纱纸嵌入夹槽。
+              <div class="single-figure"><figure><img src="/intro_imgs/image10.png" alt="小木凿"><figcaption class="img-caption">小木凿</figcaption></figure></div>
+            </li>
+            <li><strong>纱纸：</strong>韧性纸张，撕成条状嵌入夹槽压紧绣地。</li>
+            <li><strong>毛边纸：</strong>隔离绣地与架身，避免磨损。</li>
+            <li>
+              <strong>花箍：</strong>用于绣制大幅作品中的局部小图。
+              <div class="single-figure"><figure><img src="/intro_imgs/image11.png" alt="花箍"><figcaption class="img-caption">花箍</figcaption></figure></div>
+            </li>
+            <li>
+              <strong>剪刀：</strong>尖端微翘的小剪，紧贴布面断线，不伤绣面。
+              <div class="single-figure"><figure><img src="/intro_imgs/image12.png" alt="剪刀"><figcaption class="img-caption">剪刀</figcaption></figure></div>
+            </li>
+            <li><strong>大针（长针）：</strong>长约8cm，穿粗棉线固定边竹。</li>
+            <li><strong>小针（细针）：</strong>长约2cm，10、11、12号等，用于刺绣。</li>
+            <li><strong>搁手扁竹（枕手竹）：</strong>置于绣架上承托手部，缓解疲劳，防止弄脏绣地。</li>
+            <li><strong>毛巾：</strong>擦手汗。</li>
+            <li><strong>盖架布：</strong>暂时离开时遮盖绣品。</li>
+            <li><strong>布袋：</strong>收工时将绣架整体装入密封保护。</li>
+            <li><strong>透光台：</strong>玻璃台面下装灯管，用于过稿（画稿）。</li>
+            <li><strong>过稿笔：</strong>毛笔、勾线铅笔等，不易化水，用于定纹。</li>
+            <li><strong>洗渍用具：</strong>毛巾、清水、草酸、刷子等。</li>
+          </ol>
         ` },
       { id: 'prod_materials', label: '制作材料', content: `
           <p>广绣材料以丝与线为骨、以布为肌，选材考究直接关系成品色泽与质感。</p>
@@ -212,11 +294,11 @@ const sections = [
       { id: 'stitch_basic', label: '常用针法详解', content: `
           <h3>起针</h3>
           <p>广绣起针方法归纳为三种，一是最传统的底面打结形式起针；二是连续钉密针起针；三是回针劈线固定形式起针，根据绣面的要求选择适当的起针方法。</p>
-          <h4>一、底面打结形式起针</h4>
+          <h4>底面打结形式起针</h4>
           <p>该起针方法与平常缝补衣服的方法一样，先在线的一端打个结，从绣面的底起针，这是起针的最简单形式。</p>
           <p>穿线后把针放在手指上，在针上缠绕几个圈，拉出针，按住手上的线圈，拉紧后结便打好。</p>
           <div class="single-figure"><figure><img src="/intro_imgs/image14.png" alt="底面打结起针"><figcaption class="img-caption">底面打结起针</figcaption></figure></div>
-          <h4>二、连续钉密针起针</h4>
+          <h4>连续钉密针起针</h4>
           <p>在绣面上连续钉二至三针密针，这种起针方法的特点比较隐藏，一般把钉针隐藏在绣面，不能出现有结，在实际应用中，这种起针方法较为常见。</p>
           <p>（1）在绣面上连续钉二至三针，在接着的刺绣操作中把这几点钉针遮盖，见图。</p>
           <p>（2）连续钉密针起针可以起到藏针作用，假如在要操作绣面上施行的针法不易遮盖针眼，可以在另一个绣面上起针，通过钉针把线引到将要绣的面上。先在一个绣面下钉两针密针起针，再通过这个绣面的底层把起针引到要绣的面下。</p>
@@ -227,7 +309,7 @@ const sections = [
           <h3>收针</h3>
           <p>收针常用两种方法，一种是原地钉密两针收，另一种是借地钉密两针收，两种方法都较为常用。特别需要提醒的是广绣的收针不能用缝补衣服的那种方式在底绕结收，就算是广绣的绕结收针也应该是在面绕结再在原地落针，把结头往底拉，绕结收针在广绣工艺中很少采用。</p>
           <div class="single-figure"><figure><img src="/intro_imgs/image17.png" alt="收针示意"><figcaption class="img-caption">收针</figcaption></figure></div>
-          <h4>一、原地钉密两针</h4>
+          <h4>原地钉密两针</h4>
           <p>（1）收针操作在原地进行，方法与起针的钉针法相同，尽量把钉针隐藏在绣面的下面，操作前用针略拨开绣面，在绣面下连续钉两针密针。</p>
           <p>（2）贴绣面剪去多余绒，再用手或针理顺绣面。</p>
           <h3>直针</h3>
@@ -390,7 +472,7 @@ const sections = [
     label: '传承鉴赏',
     subs: [
       { id: 'heritage_inherit', label: '传承与保护', content: `
-          <span class="mark-ai">[AI]</span> 广绣作为粤绣的重要组成部分，于2006年被列入第一批国家级非物质文化遗产代表性项目名录。广州作为"三雕一彩一绣"的发源地，广绣是最具代表性的广州传统工艺之一。
+          <p>广绣作为粤绣的重要组成部分，于2006年被列入第一批国家级非物质文化遗产代表性项目名录。广州作为"三雕一彩一绣"的发源地，广绣是最具代表性的广州传统工艺之一。</p>
           <p>广绣拥有多位国家级、省级和市级非遗代表性传承人，形成了一支老中青结合的传承梯队：</p>
           <ul>
             <li><strong>陈少芳</strong>（第一批国家级非遗代表性传承人，1937年生）。1962年毕业于广州美术学院国画系，以"以画入绣"著称，创新了绒毛针、竹叶针、短发针等多种针法。其代表作《岭南锦绣》长13.8米、宽1.2米，集纳了广绣传统与创新的全部针法和技艺，被关山月感叹为"划时代之作"。她还编写《广绣》一书作为培训教材，培训技术人员不下500人次。</li>
@@ -411,15 +493,11 @@ const sections = [
       { id: 'heritage_appreciation', label: '鉴赏与收藏', content: `
           <p>鉴赏广绣可从绣面平整度、针法均匀度、色彩搭配和谐度、金银线光泽保持等角度入手。</p>
           <p>古董广绣的保存建议包括避光防紫外线、保持通风防潮、放置防虫剂等措施。</p>
-          <h3>广绣书籍推荐</h3>
-          <ul>
-            <li><strong>《中国广绣传统图案》</strong>（广州市非物质文化遗产保护中心编著，中国纺织出版社，2025年出版）：涵盖超100件文物信息，复原200多个图案矢量图。</li>
-            <li><strong>《万缕金丝：广州刺绣》</strong>（龚伯洪编著，广东教育出版社，2010年）：系统梳理广绣自唐代至当代的发展历程。</li>
-            <li><strong>《传统广绣美学》</strong>（胡大芬、雷动著，中国轻工业出版社，2019年）：对传统广绣的实物考察。</li>
-            <li><strong>《图说羊城 非遗传承》</strong>（何愿飞、王大欣、李静编，广东旅游出版社，2023年）：科普手绘丛书，介绍广彩、广绣、牙雕等非遗项目。</li>
-            <li><strong>《粤雅小丛书（第二辑）：广绣——丝路锦绣》</strong>（粤雅小丛书编委会，南方日报出版社，2023年）：广绣文化普及读本。</li>
-            <li><strong>《广绣》</strong>（陈少芳编著）：作为培训教材，打破师徒手口相传的传统模式。</li>
-          </ul>
+
+          <h3>广绣参考书目</h3>
+          <p>以下精选了 20 本广绣相关著作，涵盖历史理论、针法技艺、图案纹样及非遗传承等多个维度，供爱好者与研究者深入学习参考。</p>
+          ${bookGridHTML}
+
           <h3>博物馆与展览推荐</h3>
           <p><strong>博物馆</strong></p>
           <ul>
@@ -493,9 +571,9 @@ function handleMenuSelect(index) {
   padding: 0.8rem 2rem;
   background: #f5f7f0;
   border-bottom: 2px solid #71BA94;
+  transition: all 0.3s ease;
 }
 
-// 走马灯整体高度
 :deep(.el-carousel) {
   width: 100%;
   height: 100%;
@@ -505,7 +583,6 @@ function handleMenuSelect(index) {
   height: 100%;
 }
 
-// 卡片模式下每个卡片项
 :deep(.el-carousel__item) {
   display: flex;
   align-items: center;
@@ -517,11 +594,10 @@ function handleMenuSelect(index) {
   img {
     width: 100%;
     height: 100%;
-    object-fit: cover; // 等比放大填满卡片，按长边裁掉多余部分，保证比例不失真
+    object-fit: cover;
   }
 }
 
-// 卡片模式下，非激活的卡片变暗一点（增强视觉层次）
 :deep(.el-carousel__item.is-active) {
   box-shadow: 0 6px 24px rgba(0,0,0,0.2);
 }
@@ -531,7 +607,6 @@ function handleMenuSelect(index) {
   transform: scale(0.92);
 }
 
-// 箭头样式（卡片模式下箭头在图片外侧，不遮挡图片）
 :deep(.el-carousel__arrow) {
   background: rgba(113, 186, 148, 0.85);
   border-radius: 50%;
@@ -545,7 +620,6 @@ function handleMenuSelect(index) {
   }
 }
 
-// 指示器样式
 :deep(.el-carousel__indicators) {
   .el-carousel__button {
     background-color: #b8d4c4;
@@ -583,7 +657,6 @@ function handleMenuSelect(index) {
   background: transparent !important;
 }
 
-// 一级菜单
 :deep(.el-sub-menu .el-sub-menu__title) {
   font-size: clamp(0.9rem, 1.2vw, 1.2rem);
   font-weight: 500;
@@ -598,14 +671,13 @@ function handleMenuSelect(index) {
   }
 }
 :deep(.el-sub-menu.is-opened .el-sub-menu__title) {
-  background: #71BA94 !important;
+  background: #3f8f69 !important;
   color: #fff !important;
   .el-sub-menu__icon-arrow {
     color: #fff !important;
   }
 }
 
-// 二级菜单
 :deep(.el-menu-item) {
   font-size: clamp(0.8rem, 1.05vw, 1.05rem);
   color: #2f4d3a;
@@ -619,13 +691,13 @@ function handleMenuSelect(index) {
     background: #dce8d4 !important;
   }
   &.is-active {
-    background: #71BA94 !important;
-    color: #fff !important;
+    background: #a9d3b8 !important;
+    color: #2f6a4d !important;
     font-weight: bold;
   }
 }
 
-// 右侧内容
+// ===== 右侧内容 =====
 .content-display {
   flex: 1;
   padding: 1.5rem 2rem;
@@ -634,21 +706,47 @@ function handleMenuSelect(index) {
   font-size: 1.02rem;
   color: #2c241c;
 
+  .header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.4rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
   .page-h1 {
     font-size: 2rem;
     font-weight: 700;
     letter-spacing: 0.03em;
     border-left: 8px solid #b8865a;
     padding-left: 1.1rem;
-    margin: 0 0 1.4rem 0;
+    margin: 0;
     color: #3d2c1e;
     line-height: 1.3;
+    flex: 1;
   }
 
-  // v-html 注入的内容不带 data-v 属性，scoped 样式无法命中，
-  // 必须用 :deep() 穿透才能作用到 content-body 内部的标签
+  .toggle-carousel-btn {
+    flex-shrink: 0;
+    background: #f0f4eb;
+    border-color: #71BA94;
+    color: #2f4d3a;
+    &:hover {
+      background: #71BA94;
+      color: #fff;
+      border-color: #71BA94;
+    }
+  }
+
+  // ===== 内容主体样式 =====
   :deep(.content-body) {
     line-height: 1.7;
+
+    > p {
+      text-indent: 2em;
+      margin: 0.6rem 0;
+    }
 
     h1 {
       font-size: 1.9rem;
@@ -692,7 +790,8 @@ function handleMenuSelect(index) {
       color: #3d2c1e;
       font-weight: 700;
     }
-    ul, ol {
+    ul,
+    ol {
       padding-left: 1.8rem;
       margin: 0.6rem 0 1rem 0;
       li {
@@ -711,33 +810,11 @@ function handleMenuSelect(index) {
       margin: 1.2rem 0;
       border-radius: 0 12px 12px 0;
       color: #3e332a;
-      p { margin: 0.2rem 0; }
-    }
-    table.tool-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 0.8rem 0 1.4rem 0;
-      font-size: 0.95rem;
-      thead th {
-        background: #b8865a;
-        color: #fff;
-        text-align: left;
-        padding: 0.6rem 0.9rem;
-        &:first-child { border-radius: 8px 0 0 0; }
-        &:last-child { border-radius: 0 8px 0 0; }
-      }
-      tbody td {
-        border: 1px solid #e6d8cc;
-        padding: 0.55rem 0.9rem;
-        color: #2c241c;
-      }
-      tbody tr:nth-child(even) td {
-        background: #faf6f0;
-      }
-      tbody tr:hover td {
-        background: #f3ebe0;
+      p {
+        margin: 0.2rem 0;
       }
     }
+
     .mark-ai {
       background: #f0ebe3;
       padding: 0.1rem 0.4rem;
@@ -745,6 +822,8 @@ function handleMenuSelect(index) {
       font-size: 0.85rem;
       color: #5f4b38;
     }
+
+    // ===== 图片组（多图并排） =====
     .figure-group {
       display: flex;
       flex-wrap: wrap;
@@ -752,53 +831,76 @@ function handleMenuSelect(index) {
       justify-content: center;
       align-items: flex-start;
       margin: 1.5rem 0;
+
       figure {
-        flex: 0 1 auto;
+        flex: 0 0 calc(33.33% - 1.2rem);
         max-width: 100%;
-        background: #fcf9f6;
-        padding: 0.5rem 0.5rem 0.2rem 0.5rem;
+        background: #f8f5f0;
+        padding: 0.6rem 0.6rem 0.2rem 0.6rem;
         border-radius: 16px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+        border: 1px solid #e8e0d8;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        box-sizing: border-box;
+        transition: box-shadow 0.2s ease;
+        &:hover {
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        }
       }
-      img {
-        max-width: 100%;
-        width: 260px;
-        height: auto;
-        border-radius: 10px;
-        display: block;
-      }
-      .img-caption {
-        font-size: 0.85rem;
-        text-align: center;
-        color: #6f5a48;
-        margin-top: 0.2rem;
-      }
-    }
-    .single-figure {
-      display: flex;
-      justify-content: flex-start;
-      margin: 1.2rem 0;
-      figure {
-        max-width: 85%;
-        background: #fcf9f6;
-        padding: 0.5rem;
-        border-radius: 20px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.02);
-      }
+
       img {
         width: 100%;
-        max-width: 360px;
-        height: auto;
-        border-radius: 12px;
+        height: 200px;
+        object-fit: contain;
+        border-radius: 10px;
         display: block;
+        background: #fcf9f6;
       }
+
       .img-caption {
         font-size: 0.85rem;
         text-align: center;
         color: #6f5a48;
-        margin-top: 0.2rem;
+        margin-top: 0.3rem;
       }
     }
+
+    // ===== 单张图片（针法详解 + 工具单项配图） =====
+    .single-figure {
+      display: flex;
+      justify-content: center;
+      margin: 0.8rem 0 1.2rem 0;
+
+      figure {
+        max-width: 85%;
+        background: #f8f5f0;
+        padding: 0.6rem;
+        border-radius: 20px;
+        border: 1px solid #e8e0d8;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+        transition: box-shadow 0.2s ease;
+        &:hover {
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.07);
+        }
+      }
+
+      img {
+        width: 100%;
+        max-width: 420px;
+        max-height: 320px;
+        object-fit: contain;
+        border-radius: 12px;
+        display: block;
+        background: #fcf9f6;
+      }
+
+      .img-caption {
+        font-size: 0.85rem;
+        text-align: center;
+        color: #6f5a48;
+        margin-top: 0.3rem;
+      }
+    }
+
     .inline-img-row {
       display: flex;
       flex-wrap: wrap;
@@ -813,10 +915,120 @@ function handleMenuSelect(index) {
         padding: 0.2rem;
       }
     }
+
+    // ===== 书籍网格（每行5本，共4行，自适应页面宽度） =====
+    .book-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 1rem 1rem;
+      place-items: center;
+      margin: 1.2rem auto 1.8rem auto;
+      max-width: 1050px;
+      width: 100%;
+
+      .book-item {
+        width: 100%;
+        height: 100%;
+        box-sizing: border-box;
+        background: #faf8f5;
+        border-radius: 12px;
+        padding: 0.6rem 0.6rem 0.8rem 0.6rem;
+        border: 1px solid #ece4dc;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+
+        &:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+          border-color: #c4b4a4;
+        }
+
+        img {
+          width: 100%;
+          aspect-ratio: 3 / 4;
+          object-fit: contain;
+          border-radius: 8px;
+          background: #fcf9f6;
+          display: block;
+          border: 1px solid #eee8e0;
+        }
+
+        .book-info {
+          width: 100%;
+          text-align: center;
+          margin-top: 0.45rem;
+
+          .book-title {
+            font-size: 0.96rem;
+            font-weight: 600;
+            color: #3d2c1e;
+            line-height: 1.3;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            min-height: 0;
+          }
+
+          .book-author {
+            font-size: 0.8rem;
+            color: #7a6a5a;
+            margin-top: 0.25rem;
+            line-height: 1.3;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+          }
+
+          .book-press {
+            font-size: 0.72rem;
+            color: #9a8a7a;
+            margin-top: 0.2rem;
+            line-height: 1.2;
+            display: -webkit-box;
+            -webkit-line-clamp: 1;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+          }
+        }
+      }
+    }
   }
 }
 
 // ===== 响应式 =====
+@media (max-width: 1200px) {
+  .content-display :deep(.content-body) {
+    .book-grid {
+      max-width: 980px;
+      gap: 0.9rem 0.9rem;
+      .book-info .book-title {
+        font-size: 0.9rem;
+      }
+      .book-info .book-author {
+        font-size: 0.76rem;
+      }
+      .book-info .book-press {
+        font-size: 0.68rem;
+      }
+    }
+  }
+}
+
+@media (max-width: 992px) {
+  .content-display :deep(.content-body) {
+    .book-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      max-width: none;
+      gap: 0.8rem 0.8rem;
+    }
+  }
+}
+
 @media (max-width: 768px) {
   .carousel-section {
     padding: 0.5rem;
@@ -843,13 +1055,85 @@ function handleMenuSelect(index) {
   .content-display {
     padding: 0.8rem 1rem;
     font-size: 0.9rem;
+    .header-row {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .page-h1 {
+      font-size: 1.5rem;
+      padding-left: 0.8rem;
+    }
+    .toggle-carousel-btn {
+      align-self: flex-end;
+    }
     :deep(.content-body) {
-      h1 { font-size: 1.5rem; padding-left: 0.8rem; }
-      h2 { font-size: 1.25rem; }
-      h3 { font-size: 1.05rem; }
-      .figure-group { gap: 0.8rem; }
-      .single-figure figure { max-width: 100%; }
-      .inline-img-row img { max-width: 70px; }
+      h1 {
+        font-size: 1.5rem;
+        padding-left: 0.8rem;
+      }
+      h2 {
+        font-size: 1.25rem;
+      }
+      h3 {
+        font-size: 1.05rem;
+      }
+      .figure-group {
+        figure {
+          flex: 0 0 calc(50% - 0.8rem);
+        }
+        img {
+          height: 150px;
+        }
+      }
+      .single-figure {
+        figure {
+          max-width: 100%;
+        }
+        img {
+          max-height: 240px;
+        }
+      }
+      .inline-img-row img {
+        max-width: 70px;
+      }
+      .book-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.7rem 0.7rem;
+        .book-item {
+          padding: 0.45rem 0.45rem 0.6rem 0.45rem;
+          .book-info {
+            .book-title {
+              font-size: 0.82rem;
+            }
+            .book-author {
+              font-size: 0.68rem;
+            }
+            .book-press {
+              font-size: 0.6rem;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .content-display :deep(.content-body) {
+    .book-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.6rem 0.6rem;
+      .book-info {
+        .book-title {
+          font-size: 0.78rem;
+        }
+        .book-author {
+          font-size: 0.66rem;
+        }
+        .book-press {
+          font-size: 0.58rem;
+        }
+      }
     }
   }
 }

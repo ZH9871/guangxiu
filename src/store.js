@@ -3,10 +3,11 @@ import { defineStore } from 'pinia'
 import {computed, reactive, ref} from "vue";
 import axios from "axios";
 
-// 基础配置
+// 基础配置：API 地址通过环境变量 VITE_API_BASE_URL 配置（见 webapp/.env），
+// 未配置时默认同源（生产部署时前后端同端口）
 export const api = axios.create({
-    baseURL: 'http://127.0.0.1:5000/',
-    // baseURL: 'http://charint.sv6.tunnelfrp.com/',
+	baseURL: 'http://127.0.0.1:5000/',
+    //baseURL: import.meta.env.VITE_API_BASE_URL || '/',
 });
 
 // 请求拦截：自动携带登录 token
@@ -47,9 +48,9 @@ export const useUserStore = defineStore('user', () => {
     const t_upload_s=ref(true)
     const t_gens_s=ref(true)
     const t_selectedImageId = ref("1")
-    const t_auto_classify=ref(true)
+    const t_auto_classify=ref(false)
     const t_auto_segment=ref(true)
-    const t_mask_s = ref(true)
+    const t_mask_s = ref(false)
 
     const t2i_gen_process=ref(0)
     const t2i_gen_mask=ref(true)
@@ -86,6 +87,22 @@ export const useUserStore = defineStore('user', () => {
     }
 })
 
+// 解析当前用户：登录态有效返回本人 id，否则返回游客公用账号 id。
+// 若前端仍认为自己已登录但服务端返回的不是本人（token 已失效），
+// 则清除登录态，避免“看着像已登录，实际写入公用账号”。
+export async function resolve_current_user() {
+    const userStore = useUserStore()
+    const res = await api.get("/first_user_id")
+    const uid = res.data
+    if (userStore.isLoggedIn && uid !== userStore.user_id) {
+        userStore.token = ''
+        userStore.username = ''
+        userStore.isLoggedIn = false
+    }
+    userStore.user_id = uid
+    return uid
+}
+
 // 核心排序函数
 function sortByStarAndDate(a, b) {
     // 优先按 is_star 排序（true 在前）
@@ -97,26 +114,13 @@ function sortByStarAndDate(a, b) {
 }
 
 
-// 系统广绣图库：放置于前端 public/guangxiu_imgs 下的静态图片
+// 系统广绣图库：放置于前端 public/guangxiu_imgs 下的静态图片。
+// 文件名清单不再写死！由构建期插件 (scripts/gen-system-image-index.mjs)
+// 扫描目录自动生成 public/guangxiu_imgs/index.json，前端运行时 fetch。
 // 仅前端静态展示，不托管于后端；选中后才上传至后端 uploads 获得真实 id
-const SYSTEM_IMAGE_FILES = [
-    '13fcbc1f33fe8706a3028631cc64dd73.jpg',
-    '33f4cca37b30f81c34c2eb655b8ceb39.jpg',
-    '3528d08c7f0a98f0c0702e954db91f7b.jpg',
-    'a189d0a67794f6069d352fffd9b2747f.jpg',
-    'aad267be2f4ec8ac108228f4e1d50e90.jpg',
-    'adc1d68c385d8c69257ee5f2112a0935.jpg',
-    'b661a2dd6bae0f4a6c9d3c3162c1dc42.jpg',
-    'bd59c75d196815871bb9f192a5ffd64d.jpg',
-    'c7d398176bc0b846627c0fc73c888326.jpg',
-    'f889d5a1b71fa6760af073756f1efc36.jpg',
-    'IMG20250113145452.jpg',
-    'IMG20250113150023.jpg',
-    'IMG20250113150043.jpg',
-    'IMG20250113150152.jpg',
-    'IMG20250113153313.jpg',
-    'mmexport1737002949570.jpg'
-]
+
+// 模块级“加载中”标志，供 load_system_images 去重
+let _sysLoading = null
 
 export const useImageStore = defineStore('image', () => {
 
@@ -132,16 +136,32 @@ export const useImageStore = defineStore('image', () => {
 
     const systemImages=ref([])	//系统广绣图（前端静态，public/guangxiu_imgs）
 
-    // 加载系统广绣图库：生成静态 /guangxiu_imgs/<urlencoded 文件名> 地址
-    function load_system_images() {
-        if (systemImages.value.length > 0) return
-        systemImages.value = SYSTEM_IMAGE_FILES.map(name => ({
-            id: 'sys_' + name,          // 前端临时 id，无后端对应
-            name,
-            src: '/guangxiu_imgs/' + encodeURIComponent(name),
-            thumbnail: '/guangxiu_imgs/' + encodeURIComponent(name),
-            is_system: true
-        }))
+    // 加载系统广绣图库：动态读取目录清单，不硬编码数量
+    // index.json 由构建插件扫描目录自动生成，运行时 fetch 得到文件名数组
+    async function load_system_images() {
+        if (_sysLoading) return _sysLoading           // 防止并发重复请求
+        if (systemImages.value.length > 0) return     // 已加载则不重复
+        _sysLoading = (async () => {
+            try {
+                const res = await fetch('/guangxiu_imgs/index.json')
+                if (!res.ok) throw new Error('HTTP ' + res.status)
+                const files = await res.json()
+                systemImages.value = files.map((name) => ({
+                    id: 'sys_' + name,               // 前端临时 id，无后端对应
+                    name,
+                    // 网格显示缩略小图（.thumbs 由构建插件生成，几十 KB），
+                    // 原高清大图仅在真正需要(上传/查看)时经 src 才加载
+                    src: '/guangxiu_imgs/' + encodeURIComponent(name),
+                    thumbnail: '/guangxiu_imgs/.thumbs/' + encodeURIComponent(name) + '.webp',
+                    is_system: true
+                }))
+            } catch (e) {
+                console.error('系统图库清单加载失败:', e)
+            } finally {
+                _sysLoading = null
+            }
+        })()
+        return _sysLoading
     }
 
     // function find(id){
@@ -319,8 +339,6 @@ export const useImageStore = defineStore('image', () => {
         load_full,load_full_by_id,get_full,load_video_full,get_thumbnail,get_video_full,load_system_images
     }
 })
-
-export const systemImageFiles = SYSTEM_IMAGE_FILES
 
 export const example_poetrys=[
     {title:"《春晓》孟浩然\n",body:"夜来风雨声，\n花落知多少。"},

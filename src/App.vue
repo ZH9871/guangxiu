@@ -1,10 +1,32 @@
 <script setup>
-import { useImageStore,useUserStore,api,notyf} from '@/store'
+import { ref, onMounted, onUnmounted } from 'vue'
+import { useImageStore,useUserStore,api,notyf,resolve_current_user} from '@/store'
 const userStore =useUserStore()
 const imageStore =useImageStore()
-api.get("/first_user_id").then(res => {
-  userStore.user_id=res.data
-  imageStore.update_image_infos(userStore.user_id).then(imageStore.load_thumbnails)
+
+// 访客登录提示气泡
+const showGuestTip = ref(false)
+let tipTimer = null
+function guestActionTip() {
+  if (userStore.isLoggedIn) return
+  showGuestTip.value = true
+  if (tipTimer) clearTimeout(tipTimer)
+  tipTimer = setTimeout(() => { showGuestTip.value = false }, 2600)
+}
+// 集中拦截：访客状态点击到带 data-guest-action 的操作（上传/选图/生成/保存等）时，仅提示不阻断
+function onGuestAction(e) {
+  if (!e || !e.target) return
+  const node = e.target.closest ? e.target.closest('[data-guest-action]') : null
+  if (node) guestActionTip()
+}
+onMounted(() => document.addEventListener('click', onGuestAction, true))
+onUnmounted(() => {
+  document.removeEventListener('click', onGuestAction, true)
+  if (tipTimer) clearTimeout(tipTimer)
+})
+
+resolve_current_user().then(uid => {
+  imageStore.update_image_infos(uid).then(imageStore.load_thumbnails)
 })
 
 async function logout() {
@@ -17,9 +39,8 @@ async function logout() {
   userStore.isLoggedIn = false
   notyf.success('已退出登录')
   // 重新拿游客数据
-  const res = await api.get('/first_user_id')
-  userStore.user_id = res.data
-  imageStore.update_image_infos(userStore.user_id).then(imageStore.load_thumbnails)
+  const uid = await resolve_current_user()
+  imageStore.update_image_infos(uid).then(imageStore.load_thumbnails)
 }
 
 //notyf.success('操作成功！');
@@ -29,7 +50,6 @@ async function logout() {
   <header>
     <div class="navbar">
       <div class="navbar-link-container">
-        <router-link class="router-link" to="/">首页</router-link>
         <router-link class="router-link" to="/Guangxiu">走进广绣</router-link>
         <router-link class="router-link" to="/Teaching">辅助教学</router-link>
         <router-link class="router-link" to="/T2I">古诗词场景生成</router-link>
@@ -42,7 +62,12 @@ async function logout() {
           <button class="auth-link" @click="logout">退出</button>
         </template>
         <template v-else>
-          <router-link class="auth-link" to="/login">登录</router-link>
+          <span class="login-seat">
+            <router-link class="auth-link" to="/login">登录</router-link>
+            <transition name="tip">
+              <div v-if="showGuestTip" class="guest-tip">如需将操作数据保存到个人账号，请先登录</div>
+            </transition>
+          </span>
           <span class="guest-tag">访客</span>
         </template>
       </div>
@@ -113,10 +138,48 @@ async function logout() {
   }
 }
 .auth-area {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
   white-space: nowrap;
+}
+.login-seat {
+  position: relative;
+}
+.guest-tip {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;              /* 以登录钮右缘对齐，向左展开，避免超屏右裁 */
+  white-space: nowrap;
+  pointer-events: none; /* 不影响任何操作 */
+  z-index: 999;
+  background: #ffffff;
+  color: #c0392b;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 0;      /* 直角长方形 */
+  border: 1px solid #f5b7b1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+.guest-tip::after {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  right: 18px;
+  border: 6px solid transparent;
+  border-bottom-color: #ffffff;
+}
+/* 提示淡入淡出 */
+.tip-enter-active,
+.tip-leave-active {
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+.tip-enter-from,
+.tip-leave-to {
+  opacity: 0;
+  transform: translateX(-12px);
 }
 .auth-link {
   color: #ffffff;
@@ -136,11 +199,12 @@ async function logout() {
   color: rgba(255, 255, 255, 0.85);
 }
 .guest-tag {
-  color: #eafff2;
+  color: #ffffff;
   font-size: 13px;
+  font-weight: 600;
   padding: 4px 10px;
   border-radius: 2rem;
-  background: rgba(255, 255, 255, 0.15);
+  background: #d9534f;
   margin-left: 4px;
 }
 .user-chip {

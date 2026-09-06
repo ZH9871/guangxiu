@@ -1,0 +1,66 @@
+// Auth routes (same endpoints as before).
+import { Router } from 'express';
+
+import * as users from '../users.js';
+import { sysInfo } from '../store.js';
+
+const router = Router();
+const GUEST_TOKEN = 'GUEST';
+
+export function getTokenFromRequest(req) {
+  const auth = req.headers.authorization ?? '';
+  if (auth.startsWith('Bearer ')) return auth.slice(7).trim();
+  return (req.headers['x-access-token'] ?? '').trim();
+}
+
+router.get('/first_user_id', (req, res) => {
+  const token = getTokenFromRequest(req);
+  if (token && token !== GUEST_TOKEN) {
+    const userId = users.resolveToken(token);
+    if (userId) return res.json(userId);
+  }
+  const guest = Object.keys(sysInfo.data.users)[0] ?? '';
+  res.json(guest);
+});
+
+router.post('/register', (req, res) => {
+  const username = (req.body?.username ?? '').trim();
+  const password = req.body?.password ?? '';
+  if (!username || !password) return res.status(400).json({ error: '用户名和密码不能为空' });
+  if (username.length < 2 || username.length > 20) {
+    return res.status(400).json({ error: '用户名长度需为2-20个字符' });
+  }
+  if (password.length < 6) return res.status(400).json({ error: '密码长度不能少于6位' });
+  if (users.getAccountByUsername(username)) {
+    return res.status(409).json({ error: '用户名已存在' });
+  }
+  const userInfo = sysInfo.createUser();
+  if (!users.createAccount(username, password, userInfo.id)) {
+    return res.status(409).json({ error: '用户名已存在' });
+  }
+  res.json({ token: users.issueToken(userInfo.id), username, user_id: userInfo.id });
+});
+
+router.post('/login', (req, res) => {
+  const username = (req.body?.username ?? '').trim();
+  const password = req.body?.password ?? '';
+  if (!username || !password) return res.status(400).json({ error: '用户名和密码不能为空' });
+  const account = users.verifyPasswordByUsername(username, password);
+  if (!account) return res.status(401).json({ error: '用户名或密码错误' });
+  res.json({ token: users.issueToken(account.user_id), username, user_id: account.user_id });
+});
+
+router.post('/logout', (req, res) => {
+  const token = getTokenFromRequest(req);
+  if (token) users.revokeToken(token);
+  res.json({ ok: true });
+});
+
+router.get('/me', (req, res) => {
+  const token = getTokenFromRequest(req);
+  const userId = token ? users.resolveToken(token) : null;
+  if (!userId) return res.status(401).json({ error: '未登录' });
+  res.json({ token, user_id: userId });
+});
+
+export default router;
