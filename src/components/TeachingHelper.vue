@@ -170,7 +170,6 @@
 			})
 	}
 	//改变选择
-	import SvgIcon from "@/components/Toolbox/SvgIcon.vue";
 	async function selected_change(id, x1 = -1, y1 = -1, x2 = -1, y2 = -1) {
 		userStore.t_selectedImageId = id
 
@@ -1764,9 +1763,8 @@ function calculateMaskBoundingBoxFromCanvas() {
 											:class="{ starred: ii.is_star }"
 											:title="ii.is_star ? '取消收藏' : '收藏'"
 											@click.stop="toggleStar(ii)">
-											<SvgIcon
-												:color="ii.is_star ? '#ffd700' : 'currentColor'"
-												:name="ii.is_star ? 'star_full' : 'star'" />
+											<img v-if="ii.is_star" class="star-icon" src="/collected2.svg" alt="已收藏" />
+											<img v-else class="star-icon" src="/not_collected2.svg" alt="未收藏" />
 										</button>
 									</div>
 								</div>
@@ -1797,9 +1795,8 @@ function calculateMaskBoundingBoxFromCanvas() {
 												:class="{ starred: ii.is_star }"
 												:title="ii.is_star ? '取消收藏' : '收藏'"
 												@click.stop="toggleStar(ii)">
-												<SvgIcon
-													:color="ii.is_star ? '#ffd700' : 'currentColor'"
-													:name="ii.is_star ? 'star_full' : 'star'" />
+												<img v-if="ii.is_star" class="star-icon" src="/collected2.svg" alt="已收藏" />
+												<img v-else class="star-icon" src="/not_collected2.svg" alt="未收藏" />
 											</button>
 										</div>
 									</div>
@@ -1987,7 +1984,7 @@ function calculateMaskBoundingBoxFromCanvas() {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 200px;
+  min-height: 120px;
 }
 	
 	.container-upload .upload-area:hover {
@@ -2420,42 +2417,34 @@ function calculateMaskBoundingBoxFromCanvas() {
 	  left: 100%;
 	}
 
-	/* ---- 列表行内收藏按钮（圆形半透明，参考 PicManage .act） ---- */
+	/* ---- 收藏按钮：外部圆形容器 + 浅灰/浅黄底，内含纯星 svg（not_collected2/collected2） ---- */
 	.btn-show.star {
-	  width: 24px;
-	  height: 24px;
+	  width: 26px;
+	  height: 26px;
 	  padding: 0;
 	  border: none;
 	  border-radius: 50%;
-	  background: rgba(255, 255, 255, 0.75);
-	  color: rgba(0, 0, 0, 0.55);
+	  background: #e8e8e8; /* 浅灰：未收藏 */
+	  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 	  display: inline-flex;
 	  align-items: center;
 	  justify-content: center;
 	  cursor: pointer;
-	  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
-	  transition: all 0.2s ease;
+	  transition: transform 0.15s ease, background 0.2s ease;
 	}
-	.btn-show.star :deep(.svg-container) {
-	  width: 16px;
-	  height: 16px;
-	  display: inline-flex;
-	}
-	.btn-show.star :deep(.svg-icon) {
-	  width: 100%;
-	  height: 100%;
+	.btn-show.star .star-icon {
+	  width: 17px;
+	  height: 17px;
+	  display: block;
+	  object-fit: contain;
+	  pointer-events: none;
+	  transition: transform 0.15s ease;
 	}
 	.btn-show.star.starred {
-	  background: #fff7d6;
+	  background: #fff7d6; /* 浅黄：已收藏（与 PicManage 收藏态一致） */
 	}
-	.btn-show.star.starred :deep(.svg-icon) {
-	  fill: #ffd700 !important;
-	  stroke: #ffd700 !important;
-	}
-	.btn-show.star:hover {
-	  background: #fff3cd;
-	  color: #d4a017;
-	  transform: scale(1.1);
+	.btn-show.star:hover .star-icon {
+	  transform: scale(1.12);
 	}
 	/* 分类下拉内的分割图行（复用右侧 gallery-item 观感） */
 	.gallery-item:hover {

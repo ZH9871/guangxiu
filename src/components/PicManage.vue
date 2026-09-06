@@ -1,7 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useImageStore, useUserStore, api, resolve_current_user } from '@/store'
-import SvgIcon from "@/components/Toolbox/SvgIcon.vue";
 import { download_image } from "@/tools.js";
 import ImageNameEditor from "@/components/Toolbox/ImageNameEditor.vue";
 
@@ -262,18 +261,19 @@ async function processFile(file) {
               <!-- 系统图为前端静态图，无后端id，不提供收藏/删除/改名 -->
               <div v-if="!img.is_system" class="card-actions">
                 <button class="act star" :class="{ starred: img.is_star }" title="收藏" @click.stop="toggleStar(img)">
-                  <SvgIcon :name="img.is_star ? 'star_full' : 'star'" />
+                  <img v-if="img.is_star" class="act-img" src="/collected2.svg" alt="取消收藏" />
+                  <img v-else class="act-img" src="/not_collected.svg" alt="收藏" />
                 </button>
                 <button class="act download" title="下载" @click.stop="download_img(img)">
-                  <SvgIcon name="download" />
+                  <img class="act-img" src="/download.svg" alt="下载" />
                 </button>
                 <button class="act delete" title="删除" @click.stop="delete_img(img, activeCategory)">
-                  <SvgIcon name="trash-can" />
+                  <img class="act-img" src="/delete.svg" alt="删除" />
                 </button>
               </div>
               <div v-else class="card-actions">
                 <button class="act download" title="下载" @click.stop="download_img(img)">
-                  <SvgIcon name="download" />
+                  <img class="act-img" src="/download.svg" alt="下载" />
                 </button>
               </div>
               <!-- 图片 -->
@@ -533,38 +533,28 @@ async function processFile(file) {
   box-shadow: 0 1px 3px rgba(0,0,0,0.15);
   transition: all 0.2s ease;
 }
-.act :deep(.svg-container) {
-  width: 14px;
-  height: 14px;
-  display: flex;
+.act .act-img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  pointer-events: none;
 }
-.act :deep(.svg-icon) {
-  width: 100%;
-  height: 100%;
-}
-/* 收藏：悬停淡金色，已收藏态强制金黄色填充 */
-.act.star.starred :deep(.svg-icon) {
-  fill: #ffd700 !important;
-  stroke: #ffd700 !important;
-}
+/* 收藏：悬停淡金色，已收藏态金黄圆底高亮（collected.svg自带黄圆） */
 .act.star.starred {
   background: #fff7d6;
 }
 .act.star:hover {
   background: #fff3cd;
-  color: #d4a017;
   transform: scale(1.1);
 }
 /* 下载：悬停化蓝 */
 .act.download:hover {
   background: #e4f0ff;
-  color: #3a7bd5;
   transform: scale(1.1);
 }
 /* 删除：悬停化红 */
 .act.delete:hover {
   background: #ffe3e3;
-  color: #d64545;
   transform: scale(1.1);
 }
 .grid-img {
