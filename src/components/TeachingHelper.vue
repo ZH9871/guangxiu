@@ -239,8 +239,14 @@
 				    scale: display_scale.value
 				  });
 				  updateCanvasGeometry();
+				  resetMaskPreview();
 			}
 		}
+	}
+	// 主动切换图片/加载到画布后，把唯一预览区清回占位提示，避免上一张图的掩膜残留误判
+	function resetMaskPreview() {
+		mask_src.value = generateImageWithText(w, h, '按下鼠标左键\n拖动绘制掩膜\n右键取消掩膜', 7)
+		mask_class.value = ""
 	}
 	// 统一的笔触初始化函数
 	function initializeBrush() {
@@ -634,7 +640,7 @@
 	import {
 		download_image
 	} from '@/tools'
-	const mask_src = ref(generateImageWithText(w, h, '按下鼠标左键\n拖动绘制掩膜\n右键取消掩膜', 8))
+	const mask_src = ref(generateImageWithText(w, h, '按下鼠标左键\n拖动绘制掩膜\n右键取消掩膜', 7))
 	const mask_class = ref("")
 
 	let box = []
@@ -885,14 +891,6 @@
 		api.post('classify', payload)
 			.then(response => {
 				mask_class.value = response.data;
-				//清空画布
-				if (ctx) {
-					ctx.clearRect(0, 0, canvas.width, canvas.height);
-				}
-				//清空掩膜预览区
-				setTimeout(() => {
-				                mask_src.value = generateImageWithText(w, h, '按下鼠标左键拖动\n以绘制掩膜\n右键取消掩膜', 8);
-				}, 2000);
 			})
 			.catch(error => {
 				console.error('Error:', error);
@@ -975,10 +973,9 @@
 	        item.src = src_data
 	        item.thumbnail = src_thumbnail
 	        
-	        // 更新功能区第二个预览区
-	        segment_src.value = src_data
-	        console.log('已更新功能区第二个预览区')
-	        
+	        // 分割结果在唯一预览区展示
+	        mask_src.value = src_data
+
 	        // 添加到暂存区
 	        const existingIndex = imageStore.temp_segmentations.findIndex(seg => seg.id === item.id)
 	        if (existingIndex === -1) {
@@ -988,9 +985,6 @@
 	        } else {
 	            notyf.info('该分割已存在于暂存区')
 	        }
-	        
-	        // 清空画布
-	        ctx.clearRect(0, 0, canvas.width, canvas.height);
 	        
 	    } catch (error) {
 	        console.error('分割失败:', error)
@@ -1175,7 +1169,6 @@ function calculateMaskBoundingBoxFromCanvas() {
 	}
 	
 	var selected_segment = ref(null)
-	const segment_src = ref(generateImageWithText(w, h, '等待分割'))
 	async function selected_segmentation_changed(item) {
 		try {
 			selected_segment.value.selected = false
@@ -1183,7 +1176,7 @@ function calculateMaskBoundingBoxFromCanvas() {
 
 		selected_segment.value = item
 		await imageStore.load_full(item)
-		segment_src.value = item.src
+		mask_src.value = item.src
 		item.selected = true
 	}
 
@@ -1193,7 +1186,7 @@ function calculateMaskBoundingBoxFromCanvas() {
 	}
 
 	function download_segment() {
-		download_image(segment_src.value, "download")
+		download_image(mask_src.value, "download")
 	}
 
 	function delete_segmentation() {
@@ -1235,8 +1228,8 @@ function calculateMaskBoundingBoxFromCanvas() {
 	        item.src = src_data
 	        item.thumbnail = src_thumbnail
 	        
-	        // 更新功能区预览
-	        segment_src.value = src_data
+	        // 更新功能区预览(唯一预览区)
+	        mask_src.value = src_data
 	        
 	        // 关键修改：检查是否已存在，避免重复添加
 	        const existingIndex = imageStore.temp_segmentations.findIndex(seg => seg.id === item.id)
@@ -1314,6 +1307,8 @@ function calculateMaskBoundingBoxFromCanvas() {
 	      // 将处理好的图片设置到显示区域
 	      display_src.value = e.target.result
 	      canvasHasImage.value = true
+	      // 主动替换为本地新图片时，清空唯一预览区避免上一张残留
+	      resetMaskPreview()
 	      
 	      // 重置画布和显示参数
 	      display_scale.value = 1
@@ -1716,21 +1711,19 @@ function calculateMaskBoundingBoxFromCanvas() {
 						</div>
 					  </div>
 				<div class="flex flex-1/6 flex-col m6" style="margin: 5px; margin-top: 10px; min-width: 0;">
-					<fieldset class="fieldset bg-base-200 border-base-300 gap-5 rounded-box border p-4"
-						style="overflow: hidden;background: #ffffff;">
-						<legend class="fieldset-legend font-bold text-lg">功能区</legend>
-						<ul class="right_ui">
-							<li class="right_ui_first_li"><img class="max-h-30" :src="mask_src" style="background-color: #c7e9b8;"></li>
-							<li class="right_ui_first_li"><img class="max-h-30" :src="segment_src" style="background-color: #c7e9b8;"></li>
+					<div class="func-panel">
+						<div class="func-title">功能区</div>
+						<ul class="right_ui preview-full">
+							<li class="right_ui_first_li"><img class="max-h-30" :src="mask_src" /></li>
 						</ul>
-						<ul class="right_ui">
+						<ul class="tight">
 							<li><input type="checkbox" v-model="userStore.t_auto_classify" class="toggle">
 							自动针法识别</li>
 							<li><input type="checkbox" :checked="userStore.t_mask_s" class="toggle" @change="onSegToggleChange">显示自动分割</li>
 						</ul>
-						<ul class="right_ui">
-							<li><div class="action-btn save" data-guest-action @click="classify" style="width: 100%;">针法识别</div></li>
-							<li><div class="action-btn download" data-guest-action @click="segment_box()" style="width: 100%;">目标分割</div></li>
+						<ul class="tight pair">
+							<li><div class="action-btn save" data-guest-action @click="classify">针法识别</div></li>
+							<li><div class="action-btn download" data-guest-action @click="segment_box()">目标分割</div></li>
 						</ul>
 						
 						<!-- 针法识别结果 -->
@@ -1739,7 +1732,7 @@ function calculateMaskBoundingBoxFromCanvas() {
 							<li><span>检测到针法：</span><input type="text" class="input" v-model="mask_class" placeholder=" " /></li>
 							<!-- <li><span>置信度：</span></li> -->
 						</ul>
-					</fieldset>
+					</div>
 				</div>
 			</div>
 				
@@ -1983,8 +1976,8 @@ function calculateMaskBoundingBoxFromCanvas() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  min-height: 120px;
+  justify-content: flex-start;
+  min-height: 165px;
 }
 	
 	.container-upload .upload-area:hover {
@@ -2057,11 +2050,84 @@ function calculateMaskBoundingBoxFromCanvas() {
 		float: left;
 		margin-right: 1%;
 	}
+	/* 功能区面板：风格与右侧「暂存分割图片」一致（无外框，标题带绿竖线） */
+	.func-panel{
+		display: block;
+		border-radius: 6px;
+		background: #ffffff;
+		padding: 3px 0 8px;
+		margin: 0;
+		box-sizing: border-box;
+	}
+	.func-panel .func-title{
+		/* 与 .section-title 一致：标题前一条绿色竖线 */
+		font-size: 0.95rem;
+		font-weight: 600;
+		color: inherit;
+		border-left: 4px solid #71ba94;
+		padding-left: 10px;
+		line-height: 1.4;
+		margin-bottom: 6px;
+	}
+	/* 唯一预览格：整行 92% 且左右 4%，两端与开关/按钮行对齐 */
+	.func-panel .right_ui.preview-full{
+		width: 100%;
+		margin: 0;
+	}
+	.func-panel .right_ui.preview-full li{
+		width: 92%;
+		margin: 0 4% 6px;
+		float: none;
+	}
+	/* 两个开关、两个按钮行：同一 92%+4% 基准，横向与预览图左右对齐 */
+	.func-panel ul.tight{
+		display: flex;
+		width: 92%;
+		margin: 2px 4%;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 4px 8px;
+		padding: 0;
+	}
+	.func-panel ul.tight > li{
+		flex: 1 1 auto;
+		width: auto;
+		float: none;
+		margin: 0;
+		white-space: nowrap;
+	}
+	/* 操作按钮行 */
+	.func-panel ul.tight.pair > li{
+		width: 46%;
+	}
+	.func-panel ul.tight.pair > li{
+		flex: 1 1 44%;
+	}
+	.func-panel ul.tight .action-btn{
+		width: 100%;
+		margin: 0;
+	}
+	/* 「针法识别结果」与操作按钮留出约 10px 间隙，横向与按钮行同基准对齐 */
+	.func-panel .right_res_ui{
+		margin-left: 4%;
+		margin-right: auto;
+		margin-top: 10px;
+		width: 92%;
+		box-sizing: border-box;
+	}
+	.func-panel ul.tight.pair{
+		margin-bottom: 0;
+	}
+	/* 两个开关（非按钮行）底部到操作按钮约留 5px */
+	.func-panel ul.tight:not(.pair){
+		margin-bottom: 5px;
+	}
+
 	.right_ui_first_li{
 		background-color: #c7e9b8;
 		border:1px #2e7d32 solid;
 		border-radius: 5px;
-		aspect-ratio: 1 / 1;
+		aspect-ratio: 3 / 2;
 		display: flex;
 		align-items: center;
 		justify-content: center;
