@@ -10,21 +10,35 @@ export const api = axios.create({
     //baseURL: import.meta.env.VITE_API_BASE_URL || '/',
 });
 
-// 请求拦截：自动携带登录 token
-api.interceptors.request.use((config) => {
+// 请求拦截：自动携带登录 token。
+// 优先读当前 store 的内存态（登录写入后立即生效）；若请求恰好发生在模块极早期
+// （pinia 尚未安装/持久化尚未还原），则回退读取 localStorage，保证不漏带旧会话 token。
+// 这让后端始终以“真实 token”判断身份，避免被当成访客 → 不会再出现登录态一闪即回访客。
+export function readStoredToken() {
     try {
-        const raw = localStorage.getItem('user-store');
+        const token = useUserStore().token || ''
+        if (token) return token
+    } catch (e) {}
+    try {
+        const raw = localStorage.getItem('user-store')
         if (raw) {
-            const state = JSON.parse(raw);
-            const token = state && (state.token || (state._ && state._.token));
-            if (token) {
-                config.headers = config.headers || {};
-                config.headers['Authorization'] = 'Bearer ' + token;
-            }
+            // pinia-plugin-persistedstate 返回直接对象，或嵌套在 _ 下（旧格式兼容）
+            const state = JSON.parse(raw)
+            return (state && (state.token || (state._ && state._.token))) || ''
         }
     } catch (e) {}
-    return config;
-}, (error) => Promise.reject(error));
+    return ''
+}
+api.interceptors.request.use((config) => {
+    try {
+        const token = readStoredToken()
+        if (token) {
+            config.headers = config.headers || {}
+            config.headers['Authorization'] = 'Bearer ' + token
+        }
+    } catch (e) {}
+    return config
+}, (error) => Promise.reject(error))
 
 let uid='';
 
@@ -87,20 +101,27 @@ export const useUserStore = defineStore('user', () => {
     }
 })
 
-// 解析当前用户：登录态有效返回本人 id，否则返回游客公用账号 id。
-// 若前端仍认为自己已登录但服务端返回的不是本人（token 已失效），
-// 则清除登录态，避免“看着像已登录，实际写入公用账号”。
+// 解析当前操作所属的用户数据 id：
+//  1) 真实的登录会话 —— userId 以登录回包写入 store 的为准，直接返回本人 id。
+//     这里【不再】向后端二次推导，也【不会】据此清除登录态。原因：
+//     当页面在组件 setup 阶段（非 pinia 活跃上下文）发起 /first_user_id 时，
+//     请求可能因取不到 token 而拿回“访客 id”，旧的逻辑据此误判为 token 失效，
+//     清空登录（引起右上角用户名一闪即回访客），并把游客公开数据灌进 imageStore
+//     （引起从图库管理切到 TeachingHelper/T2I/I2V 后变成访客数据）。这违背了
+//     “登录后只访问本人账号的数据”的隔离要求。
+//  2) 未登录 —— 取系统“访客（首用户）”公用账号 id 并把数据挂在访客名下公开可见。
+//     仅未登录时才需要向后端询问访客 id。
 export async function resolve_current_user() {
     const userStore = useUserStore()
-    const res = await api.get("/first_user_id")
-    const uid = res.data
-    if (userStore.isLoggedIn && uid !== userStore.user_id) {
-        userStore.token = ''
-        userStore.username = ''
-        userStore.isLoggedIn = false
+    // 已登录：以登录回包写入的本人 id 为准，返回后不落库（已是正确值）。
+    if (userStore.token && userStore.isLoggedIn && userStore.user_id) {
+        return userStore.user_id
     }
-    userStore.user_id = uid
-    return uid
+    // 未登录（访客）：向后端取公用访客账号 id，并写回 store，
+    // 确保后续直接读取 userStore.user_id 的 CRUD（上传/保存等）挂在访客名下。
+    const res = await api.get('/first_user_id')
+    userStore.user_id = res.data
+    return userStore.user_id
 }
 
 // 核心排序函数
